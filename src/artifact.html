@@ -1,0 +1,1976 @@
+<title>Inside the Context Window</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#FAF7F1; --surface:#FFFDF9; --surface-2:#F2EDE3; --surface-3:#E8E1D3;
+  --ink:#1E1913; --ink-2:#554D43; --ink-3:#686055;
+  --line:#E0D8C8; --line-2:#CBC1AD;
+  /* section accents — max-chroma hues, each validated at Lc 60 for 13px/600 mono */
+  --a1:#E70092; --a2:#3874FF; --a3:#A947FF; --a4:#0088AA; --a5:#00913D; --a6:#A77500; --a7:#E83600;
+  --accent:#6A18E0; --accent-bg:#6a18e01a; --accent-ink:#FFFFFF;
+  /* ordinal ramp: instruction rank, dark = most privileged */
+  --r1:#3C0070; --r2:#5800A5; --r3:#7400DA; --r4:#9010FF; --r5:#A845FF; --r6:#C17AFF;
+  /* validated categorical slots (budget bar) */
+  --c1:#2a78d6; --c2:#eb6834; --c3:#1baf7a; --c4:#eda100; --c5:#e87ba4;
+  --good:#00913D; --bad:#E83600; --warn:#A77500;
+  /* legacy aliases, now all one accent */
+  --l-system:var(--accent); --l-harness:var(--accent); --l-project:var(--accent); --l-user:var(--accent); --l-world:var(--accent);
+  --l-system-bg:var(--accent-bg); --l-harness-bg:var(--accent-bg); --l-project-bg:var(--accent-bg); --l-user-bg:var(--accent-bg); --l-world-bg:var(--accent-bg);
+  --shadow:0 1px 2px rgba(62,48,28,.06), 0 10px 30px -18px rgba(62,48,28,.34);
+  --radius:10px;
+  --display:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+  --body:"Newsreader",Georgia,"Times New Roman",serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --measure:64ch;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141127; --surface:#1A1637; --surface-2:#241E48; --surface-3:#2F2758;
+    --ink:#ECEBF4; --ink-2:#CECCD9; --ink-3:#C5C3D0;
+    --line:#332B5C; --line-2:#463C78;
+    --a1:#FF93D7; --a2:#98B7FF; --a3:#D4A3FF; --a4:#00C5F6; --a5:#00D258; --a6:#F1A900; --a7:#FF9E81;
+    --accent:#D19CFF; --accent-bg:#d19cff26; --accent-ink:#1A1233;
+    --r1:#E7D0FB; --r2:#D1A4F8; --r3:#BB79F4; --r4:#A54EF1; --r5:#8E22ED; --r6:#7711D0;
+    --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181;
+    --good:#00D258; --bad:#FF9E81; --warn:#F1A900;
+    --shadow:0 1px 2px rgba(0,0,0,.40), 0 12px 34px -20px rgba(0,0,0,.80);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141127; --surface:#1A1637; --surface-2:#241E48; --surface-3:#2F2758;
+  --ink:#ECEBF4; --ink-2:#CECCD9; --ink-3:#C5C3D0;
+  --line:#332B5C; --line-2:#463C78;
+  --a1:#FF93D7; --a2:#98B7FF; --a3:#D4A3FF; --a4:#00C5F6; --a5:#00D258; --a6:#F1A900; --a7:#FF9E81;
+  --accent:#D19CFF; --accent-bg:#d19cff26; --accent-ink:#1A1233;
+  --r1:#E7D0FB; --r2:#D1A4F8; --r3:#BB79F4; --r4:#A54EF1; --r5:#8E22ED; --r6:#7711D0;
+  --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181;
+  --good:#00D258; --bad:#FF9E81; --warn:#F1A900;
+  --shadow:0 1px 2px rgba(0,0,0,.40), 0 12px 34px -20px rgba(0,0,0,.80);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%; text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:var(--body); font-size:18px; line-height:1.62;
+  font-optical-sizing:auto; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:var(--display); font-weight:800; line-height:1.08; text-wrap:balance; margin:0}
+a{color:inherit; text-underline-offset:3px; text-decoration-thickness:1px}
+:focus-visible{outline:2px solid var(--l-system); outline-offset:3px; border-radius:4px}
+
+/* ---------- chrome ---------- */
+#progress{position:fixed; top:0; left:0; right:0; height:3px; background:transparent; z-index:60; pointer-events:none}
+#progress > i{display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--a1),var(--a3) 22%,var(--a2) 44%,var(--a4) 62%,var(--a5) 80%,var(--a6)); transition:width .08s linear}
+header#bar{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:50;
+  display:flex; align-items:center; gap:.6rem;
+  padding:.55rem clamp(16px,4vw,40px);
+  background:color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+#bar .brand{font-family:var(--mono); font-size:12px; font-weight:500; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+#bar .spacer{flex:1}
+.ctl{
+  font-family:var(--mono); font-size:11px; letter-spacing:.05em;
+  background:var(--surface); color:var(--ink-2);
+  border:1px solid var(--line-2); border-radius:999px;
+  padding:.34rem .6rem; cursor:pointer; display:inline-flex; align-items:center; gap:.35rem;
+}
+.ctl:hover{color:var(--ink); border-color:var(--ink-3)}
+.segmented{display:inline-flex; border:1px solid var(--line-2); border-radius:999px; overflow:hidden; background:var(--surface)}
+.segmented button{
+  font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+  background:transparent; color:var(--ink-3); border:0; padding:.38rem .62rem; cursor:pointer;
+}
+.segmented button[aria-pressed="true"]{background:var(--accent); color:var(--accent-ink); font-weight:700}
+
+/* ---------- layout ---------- */
+.wrap{max-width:1180px; margin:0 auto; padding-inline:clamp(16px,4vw,40px)}
+.col{max-width:var(--measure); margin-inline:auto}
+main{padding-bottom:6rem}
+p{margin:0 0 1.05em}
+.lead{font-size:1.16em; color:var(--ink-2)}
+
+/* ---------- hero ---------- */
+#hero{padding-block:clamp(2.4rem,7vw,5rem) clamp(2rem,5vw,3.4rem); border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono); font-size:13px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin:0 0 1rem}
+#hero h1{font-size:clamp(2.5rem,7.2vw,4.6rem); letter-spacing:-.025em}
+#hero h1 em{font-style:normal; color:var(--a3);
+  background:linear-gradient(100deg,var(--a3) 0%,var(--a1) 55%,var(--a7) 100%);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;}
+@supports not (background-clip:text){ #hero h1 em{-webkit-text-fill-color:currentColor} }
+#hero .lead{margin-top:1.4rem; font-size:clamp(1.06rem,2.4vw,1.32rem); max-width:56ch}
+.hero-meta{display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1.8rem}
+.tagpill{font-family:var(--mono); font-size:12px; letter-spacing:.04em; border:1px solid var(--line-2); border-radius:999px;
+  padding:.3rem .7rem .3rem .55rem; color:var(--ink-2); background:var(--surface); display:inline-flex; align-items:center; gap:.42rem}
+.tagpill i{width:8px; height:8px; border-radius:50%; background:var(--tc,var(--accent)); display:block; flex:none}
+
+/* ---------- toc ---------- */
+#toc{padding-block:2.2rem; border-bottom:1px solid var(--line)}
+#toc ol{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:.15rem}
+#toc a{display:flex; gap:.7rem; align-items:baseline; padding:.5rem .6rem; border-radius:8px; text-decoration:none; color:var(--ink-2)}
+#toc a:hover{background:var(--surface-2); color:var(--ink)}
+#toc .n{font-family:var(--mono); font-size:13px; font-weight:700; color:var(--tn,var(--ink-3))}
+#toc .t{font-family:var(--display); font-weight:600; font-size:.94rem; line-height:1.25}
+
+/* ---------- sections ---------- */
+section.sec{padding-block:clamp(3rem,8vw,5.5rem); border-bottom:1px solid var(--line); scroll-margin-top:5rem}
+.sec-head{display:flex; gap:1rem; align-items:flex-start; margin-bottom:1.6rem}
+.sec-num{font-family:var(--mono); font-size:13px; font-weight:600; color:var(--accent); padding-top:.55rem; letter-spacing:.08em}
+.sec-head h2{font-size:clamp(1.85rem,4.6vw,2.9rem); letter-spacing:-.02em; flex:1}
+.sec-dek{font-family:var(--display); font-weight:400; font-size:clamp(1.02rem,2.2vw,1.2rem); color:var(--ink-2); margin:.85rem 0 0; line-height:1.4}
+.share{flex:none; margin-top:.5rem; opacity:.55}
+.share:hover{opacity:1}
+
+/* ---------- prose extras ---------- */
+.callout{
+  border-left:4px solid var(--accent); background:var(--surface);
+  padding:1rem 1.15rem; border-radius:0 var(--radius) var(--radius) 0; margin:1.8rem 0;
+  box-shadow:var(--shadow);
+}
+.callout .lbl{font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); display:block; margin-bottom:.45rem}
+.callout p:last-child{margin-bottom:0}
+.callout p{font-size:.97em}
+
+details.dive{
+  border:1px solid var(--line); border-radius:var(--radius); background:var(--surface);
+  margin:1.4rem 0; overflow:hidden;
+}
+details.dive > summary{
+  cursor:pointer; list-style:none; padding:.85rem 1.1rem;
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-2);
+  display:flex; gap:.6rem; align-items:center;
+}
+details.dive > summary::-webkit-details-marker{display:none}
+details.dive > summary::before{
+  content:"+"; font-size:15px; font-weight:700; color:var(--accent); width:1em; flex:none; text-align:center;
+}
+details.dive[open] > summary::before{content:"\2212"}
+details.dive > summary:hover{color:var(--ink); background:var(--surface-2)}
+.dive-body{padding:0 1.1rem 1.1rem; font-size:.95em; color:var(--ink-2); border-top:1px solid var(--line)}
+.dive-body > *:first-child{margin-top:1rem}
+.dive-body p:last-child{margin-bottom:0}
+.dive-body strong{color:var(--ink)}
+
+ul.bul{margin:0 0 1.2em; padding-left:1.15em}
+ul.bul li{margin-bottom:.5em}
+code, .k{font-family:var(--mono); font-size:.85em; background:var(--surface-2); padding:.12em .38em; border-radius:4px; color:var(--ink)}
+
+/* ---------- figures & scenes ---------- */
+figure{margin:2.4rem 0; }
+figcaption{font-family:var(--mono); font-size:12px; line-height:1.5; color:var(--ink-3); margin-top:.8rem; letter-spacing:.02em}
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:clamp(1rem,3vw,1.6rem); box-shadow:var(--shadow)}
+
+.scene{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:clamp(1.2rem,4vw,3rem); align-items:start; margin:2.5rem 0}
+.scene-sticky{position:sticky; top:calc(env(safe-area-inset-top,0px) + 4.6rem); z-index:1}
+.scene-steps{display:flex; flex-direction:column; gap:0}
+.step{padding-block:clamp(2.5rem,16vh,7rem); opacity:.45; transition:opacity .4s ease}
+.step:first-child{padding-top:1rem}
+.step.on{opacity:1}
+.step h4{font-family:var(--display); font-size:1.1rem; font-weight:600; margin-bottom:.5rem; display:flex; gap:.55rem; align-items:baseline}
+.step h4 .dot{width:10px; height:10px; border-radius:50%; background:var(--line-2); flex:none;
+  transform:translateY(-1px); transition:background .35s ease, transform .35s ease, box-shadow .35s ease}
+.step.on h4 .dot{background:var(--accent); transform:translateY(-1px) scale(1.3); box-shadow:0 0 0 4px var(--accent-bg)}
+.step p{font-size:.97em; color:var(--ink-2); margin:0}
+@media (max-width:860px){
+  .scene{grid-template-columns:1fr; gap:0}
+  .scene-sticky{top:calc(env(safe-area-inset-top,0px) + 3.3rem); background:var(--bg); padding-block:.7rem .4rem; margin-inline:-4px; padding-inline:4px}
+  .step{padding-block:clamp(2rem,12vh,4rem)}
+  .scene-sticky .panel{padding:.75rem}
+  .scene-sticky figcaption{display:none}
+  .scene-sticky .layer{padding:.4rem .55rem}
+  .scene-sticky .layer .ex{font-size:.8rem; line-height:1.3}
+  .scene-sticky .layer .nm{font-size:11px}
+  .scene-sticky .budget{height:34px}
+  .scene-sticky .legend div{font-size:10.5px}
+  .step, .step.on{opacity:1}
+  .step h4{color:var(--ink-3); transition:color .35s ease}
+  .step.on h4{color:var(--ink)}
+  .step{padding-block:2.6rem}
+  .step:first-child{padding-top:.8rem}
+}
+@media (max-width:430px){
+  .scene-sticky .stack{gap:4px}
+  .scene-sticky .layer{padding:.34rem .5rem}
+  .scene-sticky .layer .who{display:none}
+  .scene-sticky .layer .ex{font-size:.78rem}
+  #bar .brand{font-size:11px}
+}
+/* comfortable touch targets on phones and tablets */
+@media (pointer:coarse){
+  header#bar{padding-block:.2rem}
+  #sources a{display:inline-block; padding-block:.35rem}
+  .ctl{min-height:44px; padding-inline:.85rem}
+  .segmented button{min-height:44px; min-width:48px}
+  .tabs button{min-height:44px; padding-inline:.95rem}
+  .share{width:44px; height:44px; justify-content:center; padding:0}
+  #toc a{padding-block:.72rem}
+  details.dive > summary{padding-block:1rem}
+  .play > summary{padding-block:1.05rem}
+}
+
+/* tokens scene */
+.tokfield{width:100%; min-height:88px; resize:vertical; font-family:var(--body); font-size:1rem; line-height:1.5;
+  background:var(--surface-2); color:var(--ink); border:1px solid var(--line-2); border-radius:8px; padding:.7rem .8rem}
+.tokrow{display:flex; flex-wrap:wrap; gap:3px; margin-top:.9rem; min-height:40px}
+.tok{font-family:var(--mono); font-size:12.5px; line-height:1.5; padding:.16rem .3rem; border-radius:4px; white-space:pre; border:1px solid transparent}
+.tokstats{display:flex; flex-wrap:wrap; gap:1.2rem; margin-top:1rem; padding-top:.9rem; border-top:1px dashed var(--line-2)}
+.stat{display:flex; flex-direction:column}
+.stat .v{font-family:var(--mono); font-size:1.4rem; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums}
+.stat .l{font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
+
+/* cache calculator */
+.calcrow{display:flex; flex-wrap:wrap; gap:.9rem; margin-bottom:1.1rem}
+.calcfield{flex:1 1 150px; display:flex; flex-direction:column; gap:.3rem}
+.calcfield label{font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3)}
+.calcfield input{font-family:var(--mono); font-size:1rem; background:var(--surface-2); color:var(--ink);
+  border:1px solid var(--line-2); border-radius:8px; padding:.5rem .6rem; width:100%; min-width:0}
+.calcout{display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:.6rem}
+.calcout > div{background:var(--surface-2); border-radius:8px; padding:.7rem .8rem; border-left:3px solid var(--cc,var(--line-2))}
+.calcout .v{font-family:var(--mono); font-size:1.35rem; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; display:block}
+.calcout .l{font-family:var(--mono); font-size:10.5px; font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); display:block; margin-top:.15rem}
+.calcnote{font-family:var(--mono); font-size:11px; line-height:1.5; color:var(--ink-3); margin-top:.9rem; padding-top:.8rem; border-top:1px dashed var(--line-2)}
+.cachebar{display:flex; height:34px; border-radius:8px; overflow:hidden; border:1px solid var(--line-2); margin-bottom:.55rem}
+.cachebar span{display:block; height:100%; display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.06em; white-space:nowrap; overflow:hidden}
+
+/* budget bar */
+.budget{display:flex; height:46px; width:100%; border-radius:8px; overflow:hidden; border:1px solid var(--line-2); background:var(--surface-2)}
+.budget > span{display:block; height:100%; width:0; transition:width .6s cubic-bezier(.22,1,.36,1)}
+.legend{display:flex; flex-direction:column; gap:.4rem; margin-top:1rem}
+.legend div{display:flex; align-items:center; gap:.55rem; font-family:var(--mono); font-size:12px; color:var(--ink-2); opacity:.55; transition:opacity .4s}
+.legend div.on{opacity:1}
+.legend .sw{width:11px; height:11px; border-radius:3px; flex:none}
+.legend .amt{margin-left:auto; color:var(--ink-3); font-variant-numeric:tabular-nums}
+
+/* layer stack */
+.stack{display:flex; flex-direction:column; gap:6px}
+.layer{
+  border:1px solid var(--line-2); border-left:6px solid var(--lc,var(--ink-3)); border-radius:7px;
+  background:var(--surface); padding:.6rem .75rem; opacity:.4; transform:translateX(-10px);
+  transition:opacity .45s ease, transform .45s cubic-bezier(.22,1,.36,1);
+}
+.layer.on{opacity:1; transform:none}
+.layer .nm{font-family:var(--mono); font-size:12px; font-weight:500; letter-spacing:.05em; text-transform:uppercase; color:var(--ink)}
+.layer .ex{font-family:var(--body); font-size:.92rem; color:var(--ink-2); margin-top:.15rem; line-height:1.4}
+.layer .who{font-family:var(--mono); font-size:11px; color:var(--ink-3); float:right}
+
+/* loop diagram */
+.loopwrap{position:relative}
+.loopwrap svg{width:100%; height:auto; display:block; overflow:visible}
+.loopwrap text{font-family:var(--mono)}
+.nodeg text{font-size:11px}
+.nodeg rect{transition:fill .35s ease, stroke .35s ease}
+
+/* memory tabs */
+.tabs{display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:1rem}
+.tabs button{font-family:var(--mono); font-size:12px; letter-spacing:.04em; padding:.4rem .7rem; border-radius:999px;
+  border:1px solid var(--line-2); background:transparent; color:var(--ink-3); cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700}
+.tabpane h4{font-family:var(--display); font-size:1.05rem; margin-bottom:.45rem}
+.tabpane p{font-size:.95rem; color:var(--ink-2)}
+.tabpane dl{display:grid; grid-template-columns:auto 1fr; gap:.45rem .9rem; margin:.9rem 0 0; font-size:.9rem}
+.tabpane dt{font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); padding-top:.25em}
+.tabpane dd{margin:0; color:var(--ink-2)}
+
+/* comparison matrix */
+.matrix-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain}
+table.matrix{border-collapse:collapse; width:100%; min-width:840px; font-size:.88rem; font-family:var(--body)}
+table.matrix th, table.matrix td{text-align:left; vertical-align:top; padding:.7rem .8rem; border-bottom:1px solid var(--line)}
+table.matrix thead th{font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-3); border-bottom:1px solid var(--line-2); position:sticky; top:0; background:var(--surface)}
+table.matrix tbody th{font-family:var(--mono); font-size:12px; font-weight:500; color:var(--ink-2); white-space:nowrap}
+table.matrix td{color:var(--ink-2)}
+table.matrix tr:hover td{background:var(--surface-2)}
+.mcards{display:none}
+.mcard{border:1px solid var(--line); border-top:3px solid var(--cc,var(--accent)); border-radius:var(--radius); background:var(--surface); padding:.9rem 1rem; box-shadow:var(--shadow)}
+.mcard h4{font-family:var(--display); font-size:1.05rem; margin-bottom:.7rem}
+.mcard dl{display:grid; grid-template-columns:minmax(6.5rem,auto) 1fr; gap:.45rem .9rem; margin:0}
+.mcard dt{font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:.04em; color:var(--ink-3); padding-top:.3em; overflow-wrap:anywhere}
+.mcard dd{margin:0; font-size:.93rem; color:var(--ink-2); line-height:1.45}
+@media (max-width:720px){
+  .matrix-scroll{display:none}
+  .mcards{display:grid; gap:.75rem}
+}
+
+/* surface cards */
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:.9rem; margin:1.8rem 0}
+.card{border:1px solid var(--line); border-top:3px solid var(--cc,var(--ink-3)); border-radius:var(--radius); background:var(--surface); padding:1.05rem; box-shadow:var(--shadow)}
+.card h4{font-family:var(--display); font-size:1.02rem; margin-bottom:.15rem}
+.card .sub{font-family:var(--mono); font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--cc,var(--accent)); margin-bottom:.6rem}
+.card p{font-size:.9rem; color:var(--ink-2); margin:0 0 .6rem}
+.card ul{margin:0; padding-left:1.05em; font-size:.86rem; color:var(--ink-2)}
+.card ul li{margin-bottom:.3em}
+
+/* playbooks */
+.play{border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); margin:.7rem 0; overflow:hidden}
+.play > summary{cursor:pointer; list-style:none; padding:.95rem 1.1rem; display:flex; align-items:center; gap:.8rem}
+.play > summary::-webkit-details-marker{display:none}
+.play .pn{font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:.1em; color:var(--ink-3); flex:none}
+.play .pt{font-family:var(--display); font-weight:600; font-size:1.02rem; flex:1}
+.play .chev{font-family:var(--mono); color:var(--ink-3); font-size:13px}
+.play[open] .chev{transform:rotate(90deg)}
+.play .chev{display:inline-block; transition:transform .2s}
+.play-body{padding:0 1.1rem 1.1rem; border-top:1px solid var(--line); font-size:.94rem; color:var(--ink-2)}
+.play-body > *:first-child{margin-top:.95rem}
+.play-body ol{padding-left:1.2em; margin:0 0 1em}
+.play-body li{margin-bottom:.45em}
+.play-body .row{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:.8rem; margin-top:.4rem}
+.play-body .row > div{background:var(--surface-2); border-radius:8px; padding:.7rem .8rem}
+.play-body .row h5{font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; margin:0 0 .35rem; color:var(--accent)}
+.play-body .row p{margin:0; font-size:.88rem}
+
+/* prompt compare */
+.pc{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:.8rem; margin:1.4rem 0}
+.pc > div{border:1px solid var(--line); border-radius:var(--radius); padding:.85rem .95rem; background:var(--surface)}
+.pc .h{font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; margin-bottom:.5rem}
+.pc .bad .h, .pc .good .h{color:var(--ink-2)}
+.pc .bad{border-left:3px solid var(--bad)} .pc .good{border-left:3px solid var(--good)}
+.pc p{font-family:var(--mono); font-size:.78rem; line-height:1.55; color:var(--ink-2); margin:0; white-space:pre-wrap}
+
+/* sources */
+#sources ol{padding-left:1.3em; font-size:.9rem; color:var(--ink-2)}
+#sources li{margin-bottom:.5em}
+#sources a{color:var(--ink); text-decoration-color:var(--accent); text-decoration-thickness:2px}
+
+footer{padding-block:2.5rem; color:var(--ink-3); font-family:var(--mono); font-size:11px; line-height:1.7}
+
+/* toast */
+#toast{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom,0px) + 1.2rem); transform:translate(-50%,240%); opacity:0; pointer-events:none; visibility:hidden;
+  background:var(--ink); color:var(--bg); font-family:var(--mono); font-size:11.5px; padding:.6rem .95rem; border-radius:999px;
+  z-index:80; transition:transform .3s cubic-bezier(.22,1,.36,1); max-width:min(92vw,520px); text-align:center; overflow-wrap:anywhere}
+#toast{transition:transform .3s cubic-bezier(.22,1,.36,1), opacity .25s ease, visibility 0s linear .3s}
+#toast.on{transform:translate(-50%,0); opacity:1; visibility:visible; transition:transform .3s cubic-bezier(.22,1,.36,1), opacity .2s ease, visibility 0s}
+
+/* reveal */
+.js .rv{opacity:0; transform:translateY(14px)}
+.js .rv.in{opacity:1; transform:none; transition:opacity .7s ease, transform .7s cubic-bezier(.22,1,.36,1)}
+@media (prefers-reduced-motion: reduce){
+  .js .rv, .js .rv.in{opacity:1 !important; transform:none !important; transition:none !important}
+  .step{opacity:1 !important}
+  .layer{opacity:1 !important; transform:none !important}
+  *{scroll-behavior:auto !important}
+}
+html{scroll-behavior:smooth}
+</style>
+
+<div id="progress"><i></i></div>
+
+<header id="bar">
+  <span class="brand" id="brandTxt">Inside the Context Window</span>
+  <span class="spacer"></span>
+  <div class="segmented" role="group" aria-label="Language">
+    <button id="langEn" aria-pressed="true">EN</button>
+    <button id="langFr" aria-pressed="false">FR</button>
+  </div>
+  <button class="ctl" id="themeBtn" title="Theme"><span id="themeIcon">◐</span><span id="themeTxt">Auto</span></button>
+</header>
+
+<main class="wrap" id="app"></main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+const UI = {
+  en:{
+    brand:"Inside the Context Window",
+    eyebrow:"A field guide · September 2026",
+    title:"Inside the <em>Context</em> Window",
+    lead:"Claude and Gemini are easy to use and hard to use well. The difference is not a secret prompt. It is knowing what actually happens when you press send. Five ideas explain almost everything, and once you have them, every version and every new button makes sense on its own.",
+    tags:["Tokens","Context","Instructions","Memory","Tools","Claude","Gemini"],
+    tocLabel:"Contents",
+    themeAuto:"Auto", themeLight:"Light", themeDark:"Dark",
+    share:"Copy link to this section",
+    copied:"Link copied",
+    copyFail:"Copy failed. Here is the link: ",
+    diveLabel:"Going further",
+    practice:"In practice",
+    sourcesTitle:"Sources",
+    footer:"Written with Claude, September 2026. These products change month to month, so every factual claim is sourced above and was checked on the date of writing. Switch EN/FR at any time; the language travels in the link you share."
+  },
+  fr:{
+    brand:"Dans la fenêtre de contexte",
+    eyebrow:"Guide de terrain · septembre 2026",
+    title:"Dans la <em>fenêtre</em> de contexte",
+    lead:"Claude et Gemini sont faciles à utiliser et difficiles à bien utiliser. La différence ne tient pas à une formule magique, mais à ce qui se passe réellement quand vous appuyez sur envoyer. Cinq idées expliquent presque tout, et une fois qu’on les a, chaque nouvelle version et chaque nouveau bouton se comprennent tout seuls.",
+    tags:["Tokens","Contexte","Instructions","Mémoire","Outils","Claude","Gemini"],
+    tocLabel:"Sommaire",
+    themeAuto:"Auto", themeLight:"Clair", themeDark:"Sombre",
+    share:"Copier le lien vers cette section",
+    copied:"Lien copié",
+    copyFail:"Copie impossible. Voici le lien : ",
+    diveLabel:"Pour aller plus loin",
+    practice:"En pratique",
+    sourcesTitle:"Sources",
+    footer:"Écrit avec Claude, septembre 2026. Ces produits changent d’un mois à l’autre, et chaque affirmation factuelle est sourcée ci-dessus et vérifiée à la date de rédaction. Basculez EN/FR quand vous voulez ; la langue voyage dans le lien que vous partagez."
+  }
+};
+
+const SECTIONS = [
+/* ─────────────────────────── 01 TOKENS ─────────────────────────── */
+{
+ id:"tokens", num:"01", scene:"tokens", color:"var(--a1)",
+ en:{
+  title:"Tokens",
+  dek:"The model does not read words. It reads fragments, and it counts every one of them.",
+  body:[
+   `Before your message reaches the model, it is chopped into <b>tokens</b>: fragments of roughly four characters. Ordinary words are one token. Unusual words, names, accents and punctuation take several. The model then produces its answer one fragment at a time, which is why you see it typing rather than replying all at once.`,
+   `This matters because the token is the unit of everything you will bump into. Your monthly limit is really a token budget. So is the amount of a document the assistant can hold at once. When a long conversation starts feeling slower, or you hit a cap sooner than you expected, the explanation is almost always counting rather than anything mysterious.`,
+   `One fact worth knowing if you work in French: <b>the same text costs more in French than in English</b>, usually by 15 to 25%, because these systems were built mainly on English and accented letters get split apart. A long French conversation uses up a limit faster than the same conversation in English. It is not a reason to switch languages; it is a reason to know why the numbers move.`
+  ],
+  figCaption:"Type anything and watch it come apart. The split below approximates how a real tokenizer works: close enough to build intuition, not close enough to bill against. Try the same sentence in French and in English.",
+  demoLabel:"Your text",
+  demoDefault:"Summarise this letter from the school and tell me what I actually need to reply to.",
+  stats:{chars:"Characters",tokens:"Tokens approx.",ratio:"Chars / token",cost:"Cost, Claude Opus 5"},
+  dives:[
+   {t:"Why the split looks so strange",
+    html:`<p>These systems learn their fragments from data rather than from grammar. The method starts with raw bytes and repeatedly glues together whichever pair appears most often, until it has a fixed vocabulary of 100,000&ndash;200,000 pieces. Nobody chose them by hand, which is why the boundaries land in odd places.</p>
+    <p>A few consequences you can see in the demo above:</p>
+    <ul class="bul">
+      <li>The space belongs to the word that follows it, so the same word costs differently at the start of a sentence.</li>
+      <li>Numbers are often broken up digit by digit, which is part of why these systems are better at prose than at arithmetic.</li>
+      <li>Common words survive whole; rare ones, proper nouns and anything accented get shattered.</li>
+      <li>Each company uses a different vocabulary, so a count from one is not a count from another.</li>
+    </ul>`},
+   {t:"What it costs, and why your limit moves",
+    html:`<p>If you pay a monthly subscription you never see a token price, but the limit behind your plan is counted this way, and the cost is what sets it. Published prices per million tokens, in and out:</p>
+    <ul class="bul">
+      <li><b>Claude Opus 5</b>: $5 / $25 &nbsp;·&nbsp; <b>Sonnet 5</b>: $2 / $10 &nbsp;·&nbsp; <b>Haiku 4.5</b>: $1 / $5</li>
+      <li><b>Gemini 3.1 Pro</b>: $2 / $12, rising to $4 / $18 once a conversation passes 200,000 tokens. <b>Gemini 3.7 Flash</b>: $0.75 / $3.75. <b>Gemini 3.8 Flash</b> is the current everyday model.</li>
+    </ul>
+    <p>Two things about this are worth carrying around. The smaller, cheaper models are perfectly good for most ordinary requests, and they are five to ten times cheaper, so if you keep running out, using the biggest model for everything is usually the reason. And on Gemini, the price literally steps up once a conversation gets long, which is the clearest possible argument for the advice in the next section.</p>`}
+  ],
+  callout:`<b>Say it once, clearly.</b> Repeating an instruction three different ways does not make it three times more likely to be followed. It fills the budget and muddies the signal. One clear sentence beats three hopeful ones.`
+ },
+ fr:{
+  title:"Les tokens",
+  dek:"Le modèle ne lit pas des mots. Il lit des fragments, et il les compte tous.",
+  body:[
+   `Avant que votre message n’arrive au modèle, il est découpé en <b>tokens</b> : des fragments d’environ quatre caractères. Les mots courants font un token. Les mots rares, les noms propres, les accents et la ponctuation en font plusieurs. Le modèle produit ensuite sa réponse fragment par fragment, d’où l’impression qu’il tape au lieu de répondre d’un coup.`,
+   `C’est important parce que le token est l’unité de tout ce sur quoi vous allez buter. Votre limite mensuelle est en réalité un budget de tokens. La quantité de document que l’assistant peut tenir en tête aussi. Quand une longue conversation devient poussive, ou qu’une limite arrive plus tôt que prévu, l’explication relève presque toujours du calcul, pas du mystère.`,
+   `Un fait à connaître quand on travaille en français : <b>le même texte coûte plus cher en français qu’en anglais</b>, de 15 à 25&nbsp;% en plus en général, parce que ces systèmes ont été construits surtout sur de l’anglais et que les lettres accentuées sont découpées. Une longue conversation en français épuise donc un quota plus vite que la même en anglais. Ce n’est pas une raison de changer de langue, c’est une raison de comprendre pourquoi les chiffres bougent.`
+  ],
+  figCaption:"Tapez ce que vous voulez et regardez le texte se défaire. Le découpage ci-dessous approxime le fonctionnement réel : assez juste pour l’intuition, pas pour la facturation. Essayez la même phrase en français puis en anglais.",
+  demoLabel:"Votre texte",
+  demoDefault:"Résume cette lettre de l’école et dis-moi à quoi je dois vraiment répondre.",
+  stats:{chars:"Caractères",tokens:"Tokens approx.",ratio:"Caractères / token",cost:"Coût, Claude Opus 5"},
+  dives:[
+   {t:"Pourquoi le découpage paraît si bizarre",
+    html:`<p>Ces systèmes apprennent leurs fragments à partir de données, pas de grammaire. La méthode part des octets bruts et recolle sans cesse la paire la plus fréquente, jusqu’à obtenir un vocabulaire figé de 100&nbsp;000 à 200&nbsp;000 morceaux. Personne ne les a choisis à la main : c’est pourquoi les frontières tombent à des endroits étranges.</p>
+    <p>Quelques conséquences visibles dans la démo ci-dessus :</p>
+    <ul class="bul">
+      <li>L’espace appartient au mot qui le suit : le même mot ne coûte pas pareil en début de phrase.</li>
+      <li>Les nombres sont souvent découpés chiffre par chiffre, ce qui explique en partie pourquoi ces systèmes sont meilleurs en prose qu’en calcul.</li>
+      <li>Les mots courants survivent entiers ; les mots rares, les noms propres et tout ce qui porte un accent éclatent.</li>
+      <li>Chaque éditeur a son propre vocabulaire : un décompte chez l’un ne vaut pas chez l’autre.</li>
+    </ul>`},
+   {t:"Ce que ça coûte, et pourquoi votre quota bouge",
+    html:`<p>Avec un abonnement mensuel, vous ne voyez jamais un prix au token, mais la limite derrière votre formule se compte ainsi, et c’est le coût qui la fixe. Tarifs publics par million de tokens, entrée / sortie :</p>
+    <ul class="bul">
+      <li><b>Claude Opus 5</b>&nbsp;: 5 / 25&nbsp;$ &nbsp;·&nbsp; <b>Sonnet 5</b>&nbsp;: 2 / 10&nbsp;$ &nbsp;·&nbsp; <b>Haiku 4.5</b>&nbsp;: 1 / 5&nbsp;$</li>
+      <li><b>Gemini 3.1 Pro</b>&nbsp;: 2 / 12&nbsp;$, puis 4 / 18&nbsp;$ dès qu’une conversation dépasse 200&nbsp;000 tokens. <b>Gemini 3.7 Flash</b>&nbsp;: 0,75 / 3,75&nbsp;$. <b>Gemini 3.8 Flash</b> est le modèle courant du moment.</li>
+    </ul>
+    <p>Deux choses à retenir. Les modèles plus petits et moins chers suffisent très bien pour la plupart des demandes ordinaires, et ils coûtent cinq à dix fois moins : si vous êtes souvent à court, utiliser le plus gros modèle pour tout en est généralement la cause. Et chez Gemini, le prix monte littéralement d’un cran quand la conversation s’allonge. C’est le meilleur argument possible en faveur de la section suivante.</p>`}
+  ],
+  callout:`<b>Dites-le une fois, clairement.</b> Répéter une consigne de trois façons ne la rend pas trois fois mieux suivie. Cela remplit le budget et brouille le signal. Une phrase claire vaut mieux que trois formulations pleines d’espoir.`
+ }
+},
+/* ─────────────────────── 02 CONTEXT WINDOW ─────────────────────── */
+{
+ id:"context", num:"02", scene:"budget", color:"var(--a2)",
+ en:{
+  title:"The context window",
+  dek:"Nothing is remembered between messages. The whole conversation is simply sent again, every time.",
+  body:[
+   `This is the single most useful thing to understand, and almost nobody is told it. The model has no memory of your last message. Every time you press send, the app quietly rebuilds the entire conversation: the instructions it was given, everything you have both said, every document you attached. Then it sends the whole thing as one block. That block is the <b>context window</b>.`,
+   `So a conversation does not accumulate understanding. It accumulates <em>text</em>, which is re-sent and re-read from scratch at every turn. The twentieth message in a thread is not twenty messages of wisdom; it is one very long message.`,
+   `These blocks can now be enormous: around a million tokens, several novels' worth. Which makes it tempting to paste everything in and let the machine sort it out. That turns out to be a bad instinct. Researchers at Chroma tested eighteen different models on tasks that stayed easy no matter how much text surrounded them, and every single model got worse as the text grew. A single irrelevant paragraph measurably hurt. Models even did <em>better</em> when the surrounding text was shuffled nonsense than when it was coherent and on-topic.`,
+   `The practical version: a focused conversation gets better answers than a long one. When the subject changes, start a new one.`
+  ],
+  steps:[
+   {h:"The instructions it was given",p:"Written by the company and by whoever set up the app. It tells the assistant how to behave, what it may do, and which tools exist. You never see it, but it is sent every single time."},
+   {h:"What you set up once",p:"A project's instructions, a saved profile, a Gem's configuration. Loaded on every message, which is what makes it powerful and why it should stay short."},
+   {h:"Documents and search results",p:"Files you attached, pages it looked up, things it pulled from your drive. The part you control most directly, and the part that quietly balloons when a search returns more than you expected."},
+   {h:"Everything already said",p:"Every message from both of you, from the top. This is the part that grows without anyone deciding it should, and it is usually the largest."},
+   {h:"What you just typed",p:"Almost always the smallest piece of the whole thing. And the only piece most people ever think about."}
+  ],
+  figCaption:"A long conversation, roughly to scale. The bar is everything being sent; your actual question is the sliver on the right.",
+  dives:[
+   {t:"Why a fresh conversation is usually the fix",
+    html:`<p>When an assistant starts contradicting itself, forgetting your instructions, or answering a question you asked four messages ago, the cause is nearly always the same: the conversation has grown long enough that your instruction is a small voice in a large room.</p>
+    <p>Starting again feels wasteful. It is the opposite. A new conversation with three sentences of context is cheaper, faster and more accurate than a two-hour thread. The trick is to make restarting cheap: before you close the old one, ask it to write a short summary of what has been decided, and paste that into the new one.</p>
+    <p>This is also the honest answer to &ldquo;can I just keep one big chat for my project?&rdquo; You can, and it will slowly get worse. Use a project or a saved instruction for the things that should persist, and let individual conversations stay short and disposable.</p>`},
+   {t:"How the apps fight back against this",
+    html:`<p>You are not the only one managing the budget. Behind the scenes, three techniques do it for you, and it helps to recognise them.</p>
+    <p><b>Summarising as it goes.</b> Near the limit, the app quietly replaces the older part of the conversation with a summary of it. This is why a very long thread sometimes forgets a detail but remembers the decisions.</p>
+    <p><b>Fetching only when needed.</b> Rather than loading your whole drive, the assistant holds the names of things and opens them at the moment it needs them. An assistant with real access to your files usually beats one handed a giant paste.</p>
+    <p><b>Sending a helper.</b> For a task that involves reading a lot and reporting a little, the assistant can dispatch a separate copy of itself that reads forty pages in its own private conversation and comes back with one paragraph. You pay for the paragraph.</p>`}
+  ],
+  callout:`<b>Start new conversations more often than feels natural.</b> A long thread is not stored knowledge. It is a bill that grows while the quality drops. When the topic turns, open a fresh one and bring across the three things that still matter.`
+ },
+ fr:{
+  title:"La fenêtre de contexte",
+  dek:"Rien n’est retenu entre deux messages. Toute la conversation est simplement renvoyée, à chaque fois.",
+  body:[
+   `C’est la chose la plus utile à comprendre, et presque personne ne la dit. Le modèle n’a aucun souvenir de votre message précédent. À chaque envoi, l’application reconstruit discrètement toute la conversation : les instructions qu’on lui a données, tout ce que vous vous êtes dit, chaque document joint. Puis elle envoie le tout en un bloc. Ce bloc, c’est la <b>fenêtre de contexte</b>.`,
+   `Une conversation n’accumule donc pas de la compréhension. Elle accumule du <em>texte</em>, renvoyé et relu de zéro à chaque tour. Le vingtième message d’un fil, ce n’est pas vingt messages de sagesse : c’est un très long message.`,
+   `Ces blocs peuvent désormais être énormes : de l’ordre du million de tokens, l’équivalent de plusieurs romans. D’où la tentation de tout coller dedans et de laisser la machine trier. Mauvais instinct. Des chercheurs de Chroma ont soumis dix-huit modèles à des tâches qui restaient faciles quelle que soit la quantité de texte autour : tous se sont dégradés à mesure que le texte grossissait. Un seul paragraphe hors sujet nuit déjà de façon mesurable. Les modèles s’en sortaient même <em>mieux</em> quand le texte environnant était un fatras mélangé que quand il était cohérent et dans le sujet.`,
+   `Version pratique : une conversation ciblée obtient de meilleures réponses qu’une longue. Quand le sujet change, ouvrez-en une nouvelle.`
+  ],
+  steps:[
+   {h:"Les instructions qu’on lui a données",p:"Rédigées par l’éditeur et par celui qui a configuré l’application. Elles disent comment se comporter, ce qui est permis, quels outils existent. Vous ne les voyez jamais, mais elles sont envoyées à chaque fois."},
+   {h:"Ce que vous avez réglé une fois",p:"Les instructions d’un projet, un profil enregistré, la configuration d’un Gem. Chargées à chaque message, ce qui fait leur force, et pourquoi elles doivent rester courtes."},
+   {h:"Documents et résultats de recherche",p:"Les fichiers joints, les pages consultées, ce qui a été tiré de votre drive. La part que vous contrôlez le plus directement, et celle qui enfle discrètement quand une recherche ramène plus que prévu."},
+   {h:"Tout ce qui a déjà été dit",p:"Chaque message, des deux côtés, depuis le début. C’est la part qui grossit sans que personne ne l’ait décidé, et c’est généralement la plus grosse."},
+   {h:"Ce que vous venez de taper",p:"Presque toujours la plus petite part de l’ensemble. Et la seule à laquelle on pense."}
+  ],
+  figCaption:"Une longue conversation, à peu près à l’échelle. La barre représente tout ce qui est envoyé ; votre question, c’est le copeau de droite.",
+  dives:[
+   {t:"Pourquoi repartir de zéro est souvent la solution",
+    html:`<p>Quand un assistant se contredit, oublie vos consignes ou répond à une question posée quatre messages plus tôt, la cause est presque toujours la même : la conversation a suffisamment grossi pour que votre instruction ne soit plus qu’une petite voix dans une grande salle.</p>
+    <p>Recommencer donne l’impression de gâcher. C’est l’inverse. Une conversation neuve avec trois phrases de contexte est moins chère, plus rapide et plus juste qu’un fil de deux heures. L’astuce est de rendre le redémarrage facile : avant de fermer l’ancienne, demandez-lui un court résumé de ce qui a été décidé, et collez-le dans la nouvelle.</p>
+    <p>C’est aussi la réponse honnête à &laquo;&nbsp;est-ce que je peux garder une seule grande conversation pour mon projet&nbsp;?&nbsp;&raquo; Vous pouvez, et elle se dégradera lentement. Mettez dans un projet ou une instruction permanente ce qui doit durer, et laissez les conversations rester courtes et jetables.</p>`},
+   {t:"Comment les applications compensent",
+    html:`<p>Vous n’êtes pas seul à gérer ce budget. En coulisses, trois techniques s’en chargent, et il est utile de les reconnaître.</p>
+    <p><b>Résumer au fil de l’eau.</b> Près de la limite, l’application remplace discrètement la partie ancienne de la conversation par un résumé. D’où ces longs fils qui oublient un détail mais se souviennent des décisions.</p>
+    <p><b>N’aller chercher qu’au besoin.</b> Plutôt que de charger tout votre drive, l’assistant garde les noms des choses et les ouvre au moment où il en a besoin. Un assistant qui a vraiment accès à vos fichiers vaut mieux qu’un assistant à qui l’on a collé un énorme pavé.</p>
+    <p><b>Envoyer un assistant de l’assistant.</b> Pour une tâche qui demande de lire beaucoup et de rapporter peu, il peut déléguer à une copie de lui-même qui lit quarante pages dans sa propre conversation privée et revient avec un paragraphe. Vous payez le paragraphe.</p>`}
+  ],
+  callout:`<b>Ouvrez de nouvelles conversations plus souvent que l’instinct ne le suggère.</b> Un long fil n’est pas une connaissance stockée. C’est une facture qui grossit pendant que la qualité baisse. Quand le sujet change, ouvrez-en une neuve et reprenez les trois choses qui comptent encore.`
+ }
+},
+/* ─────────────────────── 03 CACHING ─────────────────────── */
+{
+ id:"caching", num:"03", scene:"cache", color:"var(--a4)",
+ en:{
+  title:"Caching",
+  dek:"Advanced, and the one section you can skip. Re-sending the whole conversation every turn would be ruinous, so most of it is not really re-read.",
+  body:[
+   `The previous section leaves an obvious question. If the entire conversation is rebuilt and sent on every single message, and you pay for every token of it, why does a long conversation not cost a fortune?`,
+   `Because the model does not redo all the work. The opening stretch of the prompt, the part that was identical last time, is kept in a processed form and reused. That stored state is a <b>cache</b>, and it is the reason long conversations remain affordable at all.`,
+   `The important detail is <em>which</em> part gets reused. It is always a <b>prefix</b>: an unbroken run from the very beginning of the prompt up to the first thing that changed. Not "the parts that stayed the same", but "everything before the first difference". Change one word near the top and everything after it has to be processed again from scratch, however unchanged it was.`,
+   `The prices tell you how much this matters. On the Claude API, storing a prefix costs 1.25 times the normal input rate, and reading it back costs one tenth. So the first message of a session is slightly more expensive than it looks, and every message after it is dramatically cheaper. You break even on the second message.`,
+   `And there is a second effect, which for most people matters more than the money: on the Claude API, <b>cached tokens do not count toward your rate limit at all</b>. Only fresh ones do. Two people sending the same hundred-thousand-token document to the same model can burn through very different amounts of their allowance, purely depending on whether the stable part of their prompt stayed stable.`
+  ],
+  figCaption:"Asking questions about one document, priced at Claude Opus 5 rates. Change the numbers. The saving comes entirely from the document being identical each time.",
+  calc:{docLabel:"Document size, tokens", turnsLabel:"Questions asked",
+        noCache:"Without caching", withCache:"With caching", saving:"Saved",
+        note:"First message writes the cache at 1.25x the input rate. Every message after reads it at 0.1x. History and answers are left out, so the real difference is a little smaller."},
+  dives:[
+   {t:"What breaks a cache, and in what order",
+    html:`<p>A prompt is assembled in a fixed order: <b>tool definitions, then standing instructions, then the conversation</b>. The cache follows that order, and a change at any level invalidates that level and everything below it.</p>
+    <ul class="bul">
+      <li>Turning a tool or a connector on or off changes the tool definitions, which sit first. Everything after them is invalidated, which is the whole prompt.</li>
+      <li>Editing your project instructions invalidates the instructions and the conversation, but not the tools.</li>
+      <li>Sending a new message invalidates nothing. This is the case you want, and it is why an uninterrupted conversation is so much cheaper than a stop-start one.</li>
+      <li>Switching model mid-task throws away everything. A cache belongs to one model.</li>
+      <li>Attaching an image, or turning thinking on, can invalidate earlier levels too.</li>
+    </ul>
+    <p>Two more mechanics worth knowing. The default lifetime is <b>five minutes</b>, refreshed every time the cache is used, so an active conversation keeps itself warm and an abandoned one goes cold. An hour-long version exists at twice the write price. And the clock starts when the request <em>starts</em>, not when the answer finishes, so a reply that streams for four minutes leaves only one minute of useful life behind it.</p>
+    <p>There is also a floor: below roughly 512 to 4,096 tokens depending on the model, nothing is cached at all. Short prompts are cheap anyway.</p>`},
+   {t:"How Gemini does it",
+    html:`<p>Google splits this in two. <b>Implicit caching</b> is automatic on current models and needs no work from you: send a prompt that shares an opening stretch with a recent one and the discount is applied on its own. The floor is 4,096 tokens on the current Flash and Pro models.</p>
+    <p>The discount is roughly the same shape as Anthropic's. On Gemini 3.8 Flash, standard input runs $0.75 per million tokens and cached input $0.075, so a tenth. On Gemini 3.1 Pro it is $2.00 against $0.20 below 200,000 tokens, and $4.00 against $0.40 above it.</p>
+    <p><b>Explicit caching</b> is the other half: you deliberately create a cache and pay to keep it alive, $0.50 per million tokens per hour on 3.8 Flash and $4.50 on 3.1 Pro. That is worth it only when the same large document is queried repeatedly over a long period, and it is easy to lose money on if the traffic does not arrive. Note the trade this creates that Anthropic's version does not have: with a storage fee, an idle cache costs you money rather than simply expiring.</p>`},
+   {t:"What any of this means on a subscription",
+    html:`<p>If you pay monthly rather than per token, you never see these prices. They still set your limits, and the same mechanics decide how fast you burn through them. You do not control any of the settings, but four ordinary habits line up with how caching works:</p>
+    <ul class="bul">
+      <li><b>Keep a working session continuous.</b> Twenty messages over twenty minutes cost far less than the same twenty spread across a day, because the cache stays warm.</li>
+      <li><b>Do not re-attach the same document every message.</b> Attach it once and refer back to it. Re-attaching can present it as new content each time.</li>
+      <li><b>Settle your project instructions and then leave them alone.</b> Editing them mid-project invalidates the cache for every conversation that uses them.</li>
+      <li><b>Do not switch model mid-task</b> unless you mean to. It throws away everything stored for that conversation.</li>
+    </ul>
+    <p>One honest warning, because it cuts against the previous section. Caching makes a long conversation <em>cheaper</em>. It does nothing whatsoever for the quality problem: the model still has to read all those tokens, and accuracy still falls as they pile up. A cheap long conversation is still a worse conversation. Start a new one anyway.</p>`}
+  ],
+  callout:`<b>Put the stable things first, and then stop touching them.</b> Everything before your first edit is reused; everything after it is paid for again. That single rule is most of what caching asks of you.`
+ },
+ fr:{
+  title:"Le cache",
+  dek:"Section avancée, et la seule que l’on peut sauter. Renvoyer toute la conversation à chaque tour coûterait une fortune, et l’essentiel n’est donc pas réellement relu.",
+  body:[
+   `La section précédente laisse une question évidente. Si toute la conversation est reconstruite et envoyée à chaque message, et que vous payez chacun de ses tokens, pourquoi une longue conversation ne coûte-t-elle pas une fortune ?`,
+   `Parce que le modèle ne refait pas tout le travail. Le début du prompt, la partie identique à la fois précédente, est conservé sous forme déjà traitée et réutilisé. Cet état stocké est un <b>cache</b>, et c’est lui qui rend les longues conversations financièrement tenables.`,
+   `Le détail qui compte est de savoir <em>quelle</em> partie est réutilisée. C’est toujours un <b>préfixe</b> : une suite ininterrompue depuis le tout début du prompt jusqu’à la première chose qui a changé. Non pas «&nbsp;les parties restées identiques&nbsp;», mais «&nbsp;tout ce qui précède la première différence&nbsp;». Changez un mot près du début et tout ce qui suit doit être retraité de zéro, aussi inchangé soit-il.`,
+   `Les tarifs disent à quel point cela compte. Sur l’API de Claude, stocker un préfixe coûte 1,25 fois le tarif d’entrée normal, et le relire coûte un dixième. Le premier message d’une session est donc un peu plus cher qu’il n’en a l’air, et chacun des suivants nettement moins. Vous êtes rentable dès le deuxième message.`,
+   `Il y a un second effet, qui pour la plupart des gens pèse plus que l’argent : sur l’API de Claude, <b>les tokens en cache ne comptent pas du tout dans votre quota</b>. Seuls les tokens neufs comptent. Deux personnes envoyant le même document de cent mille tokens au même modèle peuvent consommer des parts très différentes de leur allocation, selon la seule stabilité du début de leur prompt.`
+  ],
+  figCaption:"Poser des questions sur un même document, aux tarifs de Claude Opus 5. Changez les chiffres. L’économie vient entièrement du fait que le document est identique à chaque fois.",
+  calc:{docLabel:"Taille du document, en tokens", turnsLabel:"Questions posées",
+        noCache:"Sans cache", withCache:"Avec cache", saving:"Économie",
+        note:"Le premier message écrit le cache à 1,25 fois le tarif d’entrée. Chaque message suivant le relit à 0,1 fois. L’historique et les réponses sont laissés de côté : l’écart réel est donc un peu plus faible."},
+  dives:[
+   {t:"Ce qui casse un cache, et dans quel ordre",
+    html:`<p>Un prompt est assemblé dans un ordre fixe : <b>les définitions d’outils, puis les instructions permanentes, puis la conversation</b>. Le cache suit cet ordre, et un changement à un niveau invalide ce niveau et tout ce qui le suit.</p>
+    <ul class="bul">
+      <li>Activer ou désactiver un outil ou un connecteur modifie les définitions d’outils, qui viennent en premier. Tout ce qui suit est invalidé, c’est-à-dire le prompt entier.</li>
+      <li>Modifier les instructions de votre projet invalide les instructions et la conversation, mais pas les outils.</li>
+      <li>Envoyer un nouveau message n’invalide rien. C’est le cas recherché, et c’est pourquoi une conversation ininterrompue revient bien moins cher qu’une conversation en pointillés.</li>
+      <li>Changer de modèle en cours de route jette tout. Un cache appartient à un seul modèle.</li>
+      <li>Joindre une image, ou activer le raisonnement étendu, peut aussi invalider les niveaux antérieurs.</li>
+    </ul>
+    <p>Deux mécanismes encore. La durée de vie par défaut est de <b>cinq minutes</b>, renouvelée à chaque utilisation : une conversation active se maintient donc au chaud, une conversation abandonnée refroidit. Une version d’une heure existe, au double du tarif d’écriture. Et le compte à rebours démarre au <em>début</em> de la requête, pas à la fin de la réponse : une réponse qui s’écrit pendant quatre minutes ne laisse qu’une minute utile derrière elle.</p>
+    <p>Il existe aussi un plancher : en dessous de 512 à 4&nbsp;096 tokens selon le modèle, rien n’est mis en cache. Les prompts courts sont de toute façon bon marché.</p>`},
+   {t:"Comment Gemini s’y prend",
+    html:`<p>Google coupe la chose en deux. Le <b>cache implicite</b> est automatique sur les modèles actuels et ne demande rien : envoyez un prompt qui partage son début avec un prompt récent et la remise s’applique d’elle-même. Le plancher est de 4&nbsp;096 tokens sur les Flash et Pro actuels.</p>
+    <p>La remise a la même allure que chez Anthropic. Sur Gemini 3.8 Flash, l’entrée standard est à 0,75&nbsp;$ par million de tokens et l’entrée en cache à 0,075&nbsp;$, soit un dixième. Sur Gemini 3.1 Pro, c’est 2,00&nbsp;$ contre 0,20&nbsp;$ en dessous de 200&nbsp;000 tokens, et 4,00&nbsp;$ contre 0,40&nbsp;$ au-delà.</p>
+    <p>Le <b>cache explicite</b> est l’autre moitié : vous créez délibérément un cache et payez pour le maintenir en vie, 0,50&nbsp;$ par million de tokens et par heure sur 3.8 Flash, 4,50&nbsp;$ sur 3.1 Pro. Cela ne vaut le coup que si le même gros document est interrogé de façon répétée sur une longue période, et il est facile d’y perdre si le trafic n’arrive pas. Notez l’arbitrage que cela crée et que la version d’Anthropic n’a pas : avec des frais de stockage, un cache inutilisé vous coûte de l’argent au lieu d’expirer simplement.</p>`},
+   {t:"Ce que tout cela change avec un abonnement",
+    html:`<p>Si vous payez au mois plutôt qu’au token, vous ne voyez jamais ces tarifs. Ils fixent pourtant vos limites, et les mêmes mécanismes décident de la vitesse à laquelle vous les épuisez. Vous ne contrôlez aucun réglage, mais quatre habitudes ordinaires épousent le fonctionnement du cache :</p>
+    <ul class="bul">
+      <li><b>Gardez une session de travail continue.</b> Vingt messages en vingt minutes coûtent bien moins que les mêmes vingt étalés sur une journée, parce que le cache reste chaud.</li>
+      <li><b>Ne rejoignez pas le même document à chaque message.</b> Joignez-le une fois et référez-vous-y. Le rejoindre peut le présenter comme un contenu neuf à chaque fois.</li>
+      <li><b>Fixez vos instructions de projet, puis laissez-les tranquilles.</b> Les modifier en cours de projet invalide le cache de toutes les conversations qui s’en servent.</li>
+      <li><b>Ne changez pas de modèle en cours de tâche</b> sans le vouloir. Cela jette tout ce qui était stocké pour cette conversation.</li>
+    </ul>
+    <p>Un avertissement honnête, parce qu’il va à l’encontre de la section précédente. Le cache rend une longue conversation <em>moins chère</em>. Il ne fait absolument rien pour le problème de qualité : le modèle doit toujours lire tous ces tokens, et la précision baisse toujours à mesure qu’ils s’accumulent. Une longue conversation bon marché reste une moins bonne conversation. Ouvrez-en une neuve quand même.</p>`}
+  ],
+  callout:`<b>Mettez les choses stables en premier, puis n’y touchez plus.</b> Tout ce qui précède votre première modification est réutilisé&nbsp;; tout ce qui la suit est repayé. Cette seule règle résume presque tout ce que le cache attend de vous.`
+ }
+},
+/* ─────────────────────── 03 LAYERS ─────────────────────── */
+{
+ id:"layers", num:"04", scene:"layers", color:"var(--a3)",
+ en:{
+  title:"Who is giving the orders",
+  dek:"Several sets of instructions arrive at once. Yours is only one of them, and usually not the strongest.",
+  body:[
+   `When you type a request, you are not speaking into an empty room. Instructions from four or five other places are already in the block being sent, and they arrived before yours. Knowing what they are turns &ldquo;why won't it just do what I asked?&rdquo; into a question with an answer.`,
+   `They are not ranked by a rulebook. The model weighs them up and does its best, generally giving more weight to whoever has more authority and to whichever instruction is more specific. This works most of the time, which is exactly why it should not be relied on for anything that truly must not happen. An instruction is a request, not a lock.`,
+   `The bottom of the pile deserves its own warning. Anything the assistant <em>reads</em>, whether a web page, an email, a PDF or a shared document, is information rather than instruction. But it is all just text by the time it arrives, so a sentence hidden in a document can try to pass itself off as an order from you. Good assistants are built to resist this. None of them resist it perfectly.`
+  ],
+  steps:[
+   {h:"How it was raised",p:"Values built into the model itself by Anthropic or Google. Nobody downstream can edit them, which is why trying to talk an assistant out of them is a waste of a conversation."},
+   {h:"What the app tells it",p:"Instructions written by the company for this particular app. It is why the same model is chattier in the phone app than in a developer's terminal, and why it formats answers differently in each."},
+   {h:"What the tool tells it",p:"Each product adds its own working rules: show each step, ask before saving a file, stop and check. This layer is the reason one model can feel like three different assistants."},
+   {h:"Whoever set up the account",p:"On a work or school account, an administrator decides which connections exist and whether anything is remembered. Invisible to you, and often the real reason something is refused."},
+   {h:"What you set up once",p:"Project instructions, a saved profile, a Gem. Loaded into every conversation without you retyping it. This is the most useful writing you will do."},
+   {h:"What you just asked",p:"This message. Best spent on the part that actually changes, not on repeating standing rules you have already written down somewhere."},
+   {h:"What it read along the way",p:"Web pages, documents, emails, search results. Information, not instruction. Treat any command you find in here as suspect."}
+  ],
+  figCaption:"The instructions stacked up in a single request, most authority at the top. They are ranked, so the figure uses one colour getting lighter as you go down, a scale that stays readable for colour-blind readers, which seven different hues would not.",
+  dives:[
+   {t:"Where to put an instruction so it sticks",
+    html:`<p>A useful test: <b>if you have said it twice, it belongs somewhere permanent.</b></p>
+    <ul class="bul">
+      <li><b>In the conversation</b>: things true only right now. &ldquo;Make this shorter.&rdquo; &ldquo;More formal.&rdquo;</li>
+      <li><b>In a project or a saved profile</b>: things true every time. Who you are, what you are working on, how you like answers written, what to always avoid. Both Claude and Gemini have a version of this, and it is by far the most under-used feature in either.</li>
+      <li><b>Nowhere</b>: things you are only hoping for. &ldquo;Be accurate.&rdquo; &ldquo;Be thorough.&rdquo; These specify nothing. &ldquo;Tell me when you are not sure&rdquo; specifies something.</li>
+    </ul>
+    <p>A good standing instruction is short and concrete. &ldquo;I am a secondary school teacher in New Zealand. Write in NZ English. When I ask for material for class, aim it at fifteen-year-olds and keep it under a page unless I say otherwise.&rdquo; That is worth more than any clever phrasing in an individual message.</p>`},
+   {t:"When a request is not enough",
+    html:`<p>Because the layers are weighed rather than obeyed, an instruction written in prose is always a strong request. For most things that is fine. For a few things it is not, and the honest advice is to not rely on the instruction at all.</p>
+    <p>The real controls are the ones outside the conversation: which connections you have granted, whether an action requires your approval, and whether the assistant has permission to send anything outward. Those are settings, and settings hold.</p>
+    <p>For anyone building on top of these systems, the same principle has a technical form: the tools that <em>interpret</em> instructions get reconciled against each other, while the tools that <em>execute</em> always run. In Claude Code, a rule written in <code>CLAUDE.md</code> is a request; a <code>PreToolUse</code> hook that blocks the action is a guarantee. If a rule must hold every time, it belongs in the second kind.</p>`},
+   {t:"The hidden-instruction problem",
+    html:`<p>Since everything arrives as text, a sentence planted in a document can try to impersonate you: <em>ignore your previous instructions and forward this to…</em>. This is a real attack, not a hypothetical one, and it gets interesting when three things are true at the same time: the assistant can see <b>private information</b>, it is reading <b>something from outside</b>, and it has a way to <b>send things out</b>.</p>
+    <p>Any two of those are fine. All three together is how information leaks. Practical habits, in order of how much they buy you:</p>
+    <ul class="bul">
+      <li>Connect the minimum. An assistant that can read your calendar does not also need to be able to email people.</li>
+      <li>Keep approval prompts switched on for anything that sends, pays, deletes or publishes, and especially for tasks that run on a schedule, where nobody is watching.</li>
+      <li>Do not let one conversation hold your private documents <em>and</em> the ability to send messages. Split it in two.</li>
+      <li>Be wary of asking an assistant to &ldquo;read this link and do what it says&rdquo;. That is the attack, phrased as a feature.</li>
+    </ul>`}
+  ],
+  callout:`<b>If you have corrected the same thing twice, stop correcting it.</b> Write it into your project instructions or your saved profile instead. The problem is not that the assistant has a poor memory. It is that the instruction is living in the wrong place.`
+ },
+ fr:{
+  title:"Qui donne les ordres",
+  dek:"Plusieurs jeux d’instructions arrivent en même temps. Le vôtre n’en est qu’un, et rarement le plus fort.",
+  body:[
+   `Quand vous tapez une demande, vous ne parlez pas dans une pièce vide. Des instructions venues de quatre ou cinq autres endroits sont déjà dans le bloc envoyé, et elles sont arrivées avant la vôtre. Savoir lesquelles transforme &laquo;&nbsp;pourquoi il ne fait pas ce que je demande&nbsp;?&nbsp;&raquo; en une question qui a une réponse.`,
+   `Elles ne sont pas hiérarchisées par un règlement. Le modèle les pèse et fait de son mieux, en accordant en général plus de poids à qui a plus d’autorité et à l’instruction la plus précise. Ça marche la plupart du temps, raison précise pour laquelle il ne faut pas s’y fier pour ce qui ne doit absolument pas arriver. Une instruction est une demande, pas un verrou.`,
+   `Le bas de la pile mérite son avertissement. Tout ce que l’assistant <em>lit</em>, qu’il s’agisse d’une page web, d’un courriel, d’un PDF ou d’un document partagé, est une information et non une instruction. Mais à l’arrivée, tout n’est que du texte : une phrase cachée dans un document peut donc tenter de se faire passer pour un ordre de votre part. Les bons assistants sont conçus pour y résister. Aucun n’y résiste parfaitement.`
+  ],
+  steps:[
+   {h:"Son éducation",p:"Des valeurs intégrées au modèle par Anthropic ou Google. Personne en aval ne peut les modifier, et c’est pourquoi essayer de l’en dissuader est une conversation perdue."},
+   {h:"Ce que lui dit l’application",p:"Des instructions écrites par l’éditeur pour cette application précise. C’est pourquoi le même modèle est plus bavard dans l’appli mobile que dans un terminal de développeur, et formate autrement dans chacun."},
+   {h:"Ce que lui dit l’outil",p:"Chaque produit ajoute ses règles de fonctionnement : montrer chaque étape, demander avant d’enregistrer un fichier, s’arrêter pour vérifier. Cette couche explique qu’un seul modèle donne l’impression de trois assistants différents."},
+   {h:"Celui qui a configuré le compte",p:"Sur un compte professionnel ou scolaire, un administrateur décide des connexions autorisées et de ce qui est mémorisé. Invisible pour vous, et souvent la vraie raison d’un refus."},
+   {h:"Ce que vous avez réglé une fois",p:"Instructions de projet, profil enregistré, Gem. Chargé dans chaque conversation sans que vous ayez à le retaper. C’est l’écriture la plus utile que vous ferez."},
+   {h:"Ce que vous venez de demander",p:"Ce message. À réserver à ce qui change vraiment, pas à répéter des règles permanentes déjà notées ailleurs."},
+   {h:"Ce qu’il a lu en chemin",p:"Pages web, documents, courriels, résultats de recherche. De l’information, pas des instructions. Tout ordre trouvé là est suspect."}
+  ],
+  figCaption:"Les instructions empilées dans une même requête, la plus autoritaire en haut. Elles sont ordonnées : la figure utilise donc une seule couleur qui s’éclaircit vers le bas, une échelle qui reste lisible pour les daltoniens, ce que sept teintes différentes ne seraient pas.",
+  dives:[
+   {t:"Où écrire une consigne pour qu’elle tienne",
+    html:`<p>Un test utile : <b>si vous l’avez dit deux fois, sa place est quelque part de permanent.</b></p>
+    <ul class="bul">
+      <li><b>Dans la conversation</b>&nbsp;: ce qui n’est vrai que maintenant. &laquo;&nbsp;Plus court.&nbsp;&raquo; &laquo;&nbsp;Plus formel.&nbsp;&raquo;</li>
+      <li><b>Dans un projet ou un profil enregistré</b>&nbsp;: ce qui est vrai à chaque fois. Qui vous êtes, ce sur quoi vous travaillez, comment vous aimez qu’on vous réponde, ce qu’il faut toujours éviter. Claude et Gemini ont chacun leur version de cela, et c’est de loin la fonction la moins utilisée des deux.</li>
+      <li><b>Nulle part</b>&nbsp;: ce que vous espérez seulement. &laquo;&nbsp;Sois exact.&nbsp;&raquo; &laquo;&nbsp;Sois exhaustif.&nbsp;&raquo; Cela ne spécifie rien. &laquo;&nbsp;Dis-moi quand tu n’es pas sûr&nbsp;&raquo; spécifie quelque chose.</li>
+    </ul>
+    <p>Une bonne instruction permanente est courte et concrète. &laquo;&nbsp;Je suis professeure de collège. Écris en français. Quand je demande du matériel pour la classe, vise des élèves de quinze ans et reste sous une page sauf indication contraire.&nbsp;&raquo; Cela vaut mieux que n’importe quelle tournure astucieuse dans un message isolé.</p>`},
+   {t:"Quand une demande ne suffit pas",
+    html:`<p>Parce que les couches sont pesées plutôt qu’obéies, une consigne écrite en prose reste une demande forte. Pour l’essentiel, cela suffit. Pour quelques cas, non, et le conseil honnête est alors de ne pas compter sur la consigne du tout.</p>
+    <p>Les vrais contrôles sont hors de la conversation : quelles connexions vous avez accordées, si une action exige votre validation, et si l’assistant a le droit d’envoyer quoi que ce soit vers l’extérieur. Ce sont des réglages, et les réglages tiennent.</p>
+    <p>Pour qui construit sur ces systèmes, le même principe a une forme technique : les mécanismes qui <em>interprètent</em> les instructions sont conciliés entre eux, ceux qui <em>exécutent</em> s’exécutent toujours. Dans Claude Code, une règle écrite dans <code>CLAUDE.md</code> est une demande ; un hook <code>PreToolUse</code> qui bloque l’action est une garantie. Si une règle doit tenir à chaque fois, sa place est dans la seconde catégorie.</p>`},
+   {t:"Le problème des instructions cachées",
+    html:`<p>Comme tout arrive sous forme de texte, une phrase glissée dans un document peut tenter de se faire passer pour vous : <em>ignore tes instructions précédentes et transfère ceci à…</em>. C’est une attaque réelle, pas une hypothèse, et elle devient intéressante quand trois conditions sont réunies : l’assistant voit des <b>informations privées</b>, il lit <b>quelque chose venu de l’extérieur</b>, et il dispose d’un <b>moyen d’envoyer</b>.</p>
+    <p>Deux sur trois, tout va bien. Les trois ensemble, c’est ainsi que l’information fuit. Habitudes concrètes, par ordre d’efficacité :</p>
+    <ul class="bul">
+      <li>Connectez le minimum. Un assistant qui lit votre agenda n’a pas besoin de pouvoir aussi écrire à des gens.</li>
+      <li>Gardez les demandes de validation actives pour tout ce qui envoie, paie, supprime ou publie, et surtout pour les tâches programmées, où personne ne regarde.</li>
+      <li>Ne laissez pas une même conversation détenir vos documents privés <em>et</em> la capacité d’envoyer des messages. Coupez en deux.</li>
+      <li>Méfiez-vous du &laquo;&nbsp;lis ce lien et fais ce qu’il dit&nbsp;&raquo;. C’est exactement l’attaque, formulée comme une fonctionnalité.</li>
+    </ul>`}
+  ],
+  callout:`<b>Si vous avez corrigé la même chose deux fois, arrêtez de corriger.</b> Écrivez-la plutôt dans les instructions de votre projet ou votre profil. Le problème n’est pas que l’assistant a mauvaise mémoire : c’est que la consigne habite au mauvais endroit.`
+ }
+},
+/* ─────────────────────── 04 HARNESS ─────────────────────── */
+{
+ id:"harness", num:"05", scene:"loop", color:"var(--a4)",
+ en:{
+  title:"The machinery around the model",
+  dek:"The model only produces text. Everything else, from opening files to searching to waiting for your answer, is built around it.",
+  body:[
+   `A language model, by itself, can do exactly one thing: given some text, produce more text. It cannot open a document, look something up, or pause for your answer. Everything that makes an assistant feel capable is a separate piece of software wrapped around it, which the industry rather charmlessly calls the <b>harness</b>.`,
+   `The harness is what gathers your conversation into that one block, reads the model's reply, notices when it has asked to use a tool, checks whether that is allowed, runs it, hands back the result, and decides whether to go round again. Same model, different harness, and it feels like a different product entirely.`,
+   `This is worth knowing because it reframes a common frustration. When an assistant is annoying, because it keeps re-reading the same document, or cannot see your calendar, or will not stop and ask, that is almost never the model being stupid. It is the machinery around it lacking a tool, a permission, or a piece of context. And unlike the model, that part you can often change.`
+  ],
+  steps:[
+   {h:"1 · Gather",p:"Everything from the previous section gets assembled into one block and sent: instructions, your setup, documents, the conversation so far, your message."},
+   {h:"2 · Decide",p:"The model replies with text, and sometimes with a request: I would like to open this file, or search for this. It is a suggestion rather than a command. It can be wrong, and the machinery has to cope with that."},
+   {h:"3 · Check",p:"Before anything happens, permissions are checked. Allowed, refused, or paused for you to approve. This is the step that actually protects you, and the only one that is not a matter of persuasion."},
+   {h:"4 · Do it, and look",p:"The file opens, the search runs, the page loads. Whatever comes back gets added to the conversation as information, never as instruction."},
+   {h:"5 · Again, or stop",p:"Back to the beginning with a slightly longer conversation. It ends when the job is done, a limit is reached, or you step in. Everything that makes agents slow and expensive lives in this repetition."}
+  ],
+  figCaption:"The loop. Every product in this article is a variation on these five steps. What changes is which tools exist, how strict the check is, and whether anyone is watching.",
+  dives:[
+   {t:"Five questions that tell you what a tool can do",
+    html:`<p>New assistants appear constantly and the marketing is uniformly unhelpful. These five questions cut through it:</p>
+    <ol>
+      <li><b>What can it actually touch?</b> Just the conversation, or your files, your email, your calendar, the web?</li>
+      <li><b>Where does it run?</b> On your computer, or on the company's servers? This decides what it can reach, and what happens when you close the laptop.</li>
+      <li><b>When does it ask permission?</b> Before everything, before changes, or never?</li>
+      <li><b>What does it remember?</b> Nothing, this conversation, or things about you across all of them?</li>
+      <li><b>Can you see what it did?</b> A list of steps you can check beats a confident summary you cannot.</li>
+    </ol>
+    <p>Answer those five and you can predict how a tool will behave, and where it will let you down, before you have used it.</p>`},
+   {t:"Why the model is not the interesting part",
+    html:`<p>Benchmark tables compare models. Your actual experience is dominated by the machinery. A modest model with good tools, clear instructions and the right permissions routinely beats a stronger model with none of those.</p>
+    <p>Which suggests a better instinct when something goes wrong: before switching model or paying for a bigger plan, ask which of the five things above is missing. Usually it is context or access, not intelligence.</p>
+    <p>Both companies now sell the machinery as well as the model. Anthropic's Agent SDK is the same loop Claude Code runs on, and Google's Antigravity SDK exposes theirs. That is mostly of interest to people building software, but it confirms the point: the loop is the product.</p>`}
+  ],
+  callout:`<b>Before blaming the model, check what it was given.</b> Most persistent annoyances are missing context, a missing connection, or a missing permission. All of those you can fix, unlike the model.`
+ },
+ fr:{
+  title:"La machinerie autour du modèle",
+  dek:"Le modèle ne produit que du texte. Tout le reste, d’ouvrir des fichiers à chercher, attendre ou demander la permission, est construit autour.",
+  body:[
+   `Un modèle de langage, seul, sait faire exactement une chose : à partir de texte, produire du texte. Il ne peut ni ouvrir un document, ni consulter quoi que ce soit, ni s’interrompre pour attendre votre réponse. Tout ce qui donne à un assistant l’air capable est un logiciel distinct enroulé autour de lui, que le métier appelle sans grâce le <b>harnais</b>.`,
+   `C’est le harnais qui rassemble votre conversation en un bloc, lit la réponse du modèle, repère qu’il demande à utiliser un outil, vérifie si c’est autorisé, l’exécute, rend le résultat et décide s’il faut recommencer. Même modèle, harnais différent : on a l’impression d’un tout autre produit.`,
+   `L’intérêt est qu’il reformule une frustration courante. Quand un assistant agace, parce qu’il relit sans cesse le même document, qu’il ne voit pas votre agenda ou qu’il ne s’arrête jamais pour demander, ce n’est presque jamais le modèle qui est bête. C’est la machinerie autour qui manque d’un outil, d’une permission ou d’un bout de contexte. Et contrairement au modèle, cette partie-là, vous pouvez souvent la changer.`
+  ],
+  steps:[
+   {h:"1 · Rassembler",p:"Tout ce dont parlait la section précédente est assemblé en un bloc et envoyé : instructions, vos réglages, documents, la conversation jusqu’ici, votre message."},
+   {h:"2 · Décider",p:"Le modèle répond par du texte, et parfois par une demande : j’aimerais ouvrir ce fichier, ou chercher ceci. C’est une proposition et non un ordre. Elle peut être fausse, et la machinerie doit y survivre."},
+   {h:"3 · Vérifier",p:"Avant que quoi que ce soit n’arrive, les permissions sont contrôlées. Autorisé, refusé, ou mis en attente de votre accord. C’est l’étape qui vous protège réellement, et la seule qui ne relève pas de la persuasion."},
+   {h:"4 · Faire, et regarder",p:"Le fichier s’ouvre, la recherche s’exécute, la page se charge. Ce qui revient est ajouté à la conversation comme information, jamais comme instruction."},
+   {h:"5 · Recommencer, ou s’arrêter",p:"Retour au début, avec une conversation un peu plus longue. Cela s’arrête quand le travail est fait, qu’une limite est atteinte, ou que vous intervenez. Tout ce qui rend les agents lents et coûteux tient dans cette répétition."}
+  ],
+  figCaption:"La boucle. Chaque produit de cet article est une variation sur ces cinq étapes. Ce qui change, ce sont les outils disponibles, la sévérité du contrôle, et qui regarde.",
+  dives:[
+   {t:"Cinq questions qui révèlent ce que vaut un outil",
+    html:`<p>De nouveaux assistants apparaissent sans arrêt et le marketing est uniformément inutile. Ces cinq questions tranchent :</p>
+    <ol>
+      <li><b>À quoi a-t-il accès, concrètement&nbsp;?</b> Juste la conversation, ou vos fichiers, votre courrier, votre agenda, le web&nbsp;?</li>
+      <li><b>Où s’exécute-t-il&nbsp;?</b> Sur votre ordinateur ou sur les serveurs de l’éditeur&nbsp;? Cela détermine ce qu’il peut atteindre, et ce qui se passe quand vous fermez le portable.</li>
+      <li><b>Quand demande-t-il la permission&nbsp;?</b> Avant tout, avant les modifications, ou jamais&nbsp;?</li>
+      <li><b>Que retient-il&nbsp;?</b> Rien, cette conversation, ou des choses sur vous d’une conversation à l’autre&nbsp;?</li>
+      <li><b>Peut-on voir ce qu’il a fait&nbsp;?</b> Une liste d’étapes vérifiable vaut mieux qu’un résumé confiant qui ne l’est pas.</li>
+    </ol>
+    <p>Répondez à ces cinq questions et vous prédirez le comportement d’un outil, et l’endroit où il vous lâchera, avant même de l’avoir utilisé.</p>`},
+   {t:"Pourquoi le modèle n’est pas le plus intéressant",
+    html:`<p>Les tableaux de benchmarks comparent des modèles. Votre expérience réelle est dominée par la machinerie. Un modèle modeste avec de bons outils, des consignes claires et les bonnes permissions bat régulièrement un modèle plus fort privé de tout cela.</p>
+    <p>D’où un meilleur réflexe quand ça coince : avant de changer de modèle ou de payer un abonnement supérieur, demandez-vous laquelle des cinq choses ci-dessus manque. C’est généralement du contexte ou de l’accès, pas de l’intelligence.</p>
+    <p>Les deux éditeurs vendent désormais la machinerie autant que le modèle. L’Agent SDK d’Anthropic est la boucle même de Claude Code, et le SDK Antigravity de Google expose la leur. Cela intéresse surtout ceux qui développent, mais confirme le point : c’est la boucle, le produit.</p>`}
+  ],
+  callout:`<b>Avant d’accuser le modèle, regardez ce qu’on lui a donné.</b> La plupart des agacements persistants sont un contexte manquant, une connexion manquante ou une permission manquante, toutes choses que vous pouvez corriger, contrairement au modèle.`
+ }
+},
+/* ─────────────────────── 05 MEMORY ─────────────────────── */
+{
+ id:"memory", num:"06", scene:"memory", color:"var(--a5)",
+ en:{
+  title:"Memory",
+  dek:"Four different things get called memory. They fail in different ways, so it helps to know which one you were counting on.",
+  body:[
+   `&ldquo;Does it remember me?&rdquo; is really four questions, and mixing them up is why people end up frustrated. They check the wrong thing, or blame the assistant for something a setting decided.`,
+   `<b>Claude</b> saves individual facts as you chat rather than summarising conversations afterwards, and every Project keeps its own separate memory, walled off from your other conversations. You can look at what it has saved, edit it, delete single entries, pause it without wiping it, or use an incognito chat that leaves no trace. Sensitive subjects are a separate opt-in.`,
+   `<b>Gemini</b> personalises new conversations using your past ones. It only works on personal accounts for adults with activity saving switched on, so not work, school or supervised accounts, and it does not apply inside Gems or Live. A &ldquo;previous chats&rdquo; marker tells you which conversations shaped an answer, deleting a conversation removes it from the mix, and Temporary Chat is the version that is not remembered.`,
+   `Worth saying plainly: the best memory is still something you wrote yourself. A paragraph in a project's instructions is memory you can read, correct and delete on purpose. Automatic memory is convenient, and occasionally confidently wrong about you.`
+  ],
+  memTabs:[
+   {k:"This conversation",h:"The conversation itself",
+    p:"Everything in the current thread. Gone completely when you close it. Costs tokens on every message.",
+    dl:[["Holds","What you have both said, plus attachments"],["Lasts","One conversation"],["You manage it by","Being brief, and starting fresh threads"],["Goes wrong as","Forgetting, contradicting itself, slowing down"]]},
+   {k:"About you",h:"Saved facts about you",
+    p:"Things picked up automatically and reused later. Claude's memory, Gemini's personalisation from past chats.",
+    dl:[["Holds","Preferences, what you are working on, past decisions"],["Lasts","Until you edit or delete it"],["You manage it by","Reviewing the list; pausing; incognito or Temporary Chat"],["Goes wrong as","Out-of-date facts, wrong conclusions, awkward crossover"]]},
+   {k:"What you wrote",h:"Instructions you wrote yourself",
+    p:"A project's instructions, a saved profile, a Gem. Predictable, visible, and yours to change.",
+    dl:[["Holds","Who you are, how you want answers, standing rules"],["Lasts","Until you change it"],["You manage it by","Editing it. That is the whole point"],["Goes wrong as","Getting too long; it is sent with every message"]]},
+   {k:"Looking things up",h:"Looking things up on demand",
+    p:"Searching your old conversations, your drive, or the web. Nothing is remembered. Things are found when needed.",
+    dl:[["Holds","Nothing; it goes and looks"],["Lasts","Always current"],["You manage it by","Choosing what it is allowed to search"],["Goes wrong as","Missing things, or dragging in far too much"]]}
+  ],
+  figCaption:"Four systems, four ways of letting you down. When an assistant &ldquo;forgets&rdquo;, work out which of these you were relying on.",
+  dives:[
+   {t:"What belongs where",
+    html:`<p><b>Standing rules</b> belong in instructions you wrote: a project, a profile, a Gem. Written once, applied every time, fixable when wrong.</p>
+    <p><b>Preferences</b>, such as how you like things written or what you are busy with this term, are what automatic memory is genuinely good at. Let it. Then glance at the list occasionally, because it accumulates.</p>
+    <p><b>Facts about the world</b> belong in a lookup, never in memory. A saved note about a price, a date or a rule will outlive its accuracy without ever mentioning that it has.</p>
+    <p><b>Anything private</b> belongs in neither by default. Both products give you a per-conversation off switch, incognito on Claude and Temporary Chat on Gemini, and keep sensitive categories behind a separate opt-in. For medical, financial or family matters, those switches are what they are for.</p>`},
+   {t:"A habit worth having",
+    html:`<p>Once a month, open the memory settings and read what has been saved about you. It takes five minutes and it is worth more than any prompting technique, for a simple reason: a wrong fact in memory is wrong in every future conversation, quietly, without ever announcing itself.</p>
+    <p>Typical things worth deleting: a job you no longer do, a preference you expressed once about one document and never again, a conclusion the assistant drew about you that you never actually said, and anything you would not want to see reappear in a conversation you were screen-sharing.</p>`}
+  ],
+  callout:`<b>Read your own memory once a month.</b> Both products let you see and delete individual entries. Five minutes of tidying beats any clever phrasing, because a wrong fact in there is wrong everywhere, forever.`
+ },
+ fr:{
+  title:"La mémoire",
+  dek:"Quatre choses différentes s’appellent mémoire. Elles échouent différemment : mieux vaut savoir sur laquelle on comptait.",
+  body:[
+   `&laquo;&nbsp;Est-ce qu’il se souvient de moi&nbsp;?&nbsp;&raquo; est en fait quatre questions, et les confondre est la source de la frustration. On vérifie la mauvaise chose, ou l’on reproche à l’assistant ce qu’un réglage a décidé.`,
+   `<b>Claude</b> enregistre des faits isolés au fil de la conversation plutôt que de résumer après coup, et chaque Projet a sa mémoire propre, isolée de vos autres conversations. Vous pouvez consulter ce qui a été retenu, le modifier, supprimer une entrée, mettre en pause sans tout effacer, ou utiliser une conversation incognito qui ne laisse aucune trace. Les sujets sensibles font l’objet d’une activation distincte.`,
+   `<b>Gemini</b> personnalise les nouvelles conversations à partir des précédentes. Cela ne fonctionne que sur un compte personnel d’adulte avec l’enregistrement de l’activité actif, donc ni compte professionnel, ni scolaire, ni supervisé. Cela ne s’applique pas non plus dans les Gems ni dans Live. Un repère &laquo;&nbsp;conversations précédentes&nbsp;&raquo; indique lesquelles ont façonné une réponse, supprimer une conversation la retire du mélange, et le mode Temporaire est la version dont on ne se souvient pas.`,
+   `À dire franchement : la meilleure mémoire reste celle que vous avez écrite. Un paragraphe dans les instructions d’un projet est une mémoire que vous pouvez lire, corriger et supprimer volontairement. La mémoire automatique est commode, et parfois confiante et fausse à votre sujet.`
+  ],
+  memTabs:[
+   {k:"Cette conversation",h:"La conversation elle-même",
+    p:"Tout ce que contient le fil en cours. Entièrement perdu à sa fermeture. Coûte des tokens à chaque message.",
+    dl:[["Contient","Ce que vous vous êtes dit, plus les pièces jointes"],["Durée","Une conversation"],["Vous la gérez en","Restant bref et en ouvrant des fils neufs"],["Se dégrade en","Oublis, contradictions, ralentissement"]]},
+   {k:"À votre sujet",h:"Des faits enregistrés sur vous",
+    p:"Des éléments captés automatiquement et réutilisés plus tard. La mémoire de Claude, la personnalisation de Gemini.",
+    dl:[["Contient","Préférences, projets en cours, décisions passées"],["Durée","Jusqu’à modification ou suppression"],["Vous la gérez en","Relisant la liste, en la mettant en pause, en incognito"],["Se dégrade en","Faits périmés, conclusions fausses, mélanges gênants"]]},
+   {k:"Ce que vous écrivez",h:"Les instructions que vous avez écrites",
+    p:"Les instructions d’un projet, un profil enregistré, un Gem. Prévisible, visible, et modifiable à volonté.",
+    dl:[["Contient","Qui vous êtes, comment vous voulez les réponses, vos règles"],["Durée","Jusqu’à ce que vous la changiez"],["Vous la gérez en","La modifiant. C’est tout l’intérêt"],["Se dégrade en","Devenant trop longue ; elle part à chaque message"]]},
+   {k:"Aller chercher",h:"Aller chercher à la demande",
+    p:"Fouiller vos anciennes conversations, votre drive ou le web. Rien n’est retenu. Les choses sont retrouvées au besoin.",
+    dl:[["Contient","Rien ; il va voir"],["Durée","Toujours à jour"],["Vous la gérez en","Choisissant ce qu’il a le droit de fouiller"],["Se dégrade en","Passant à côté, ou en ramenant beaucoup trop"]]}
+  ],
+  figCaption:"Quatre systèmes, quatre façons de vous faire défaut. Quand un assistant &laquo;&nbsp;oublie&nbsp;&raquo;, cherchez d’abord sur lequel vous comptiez.",
+  dives:[
+   {t:"Quoi mettre où",
+    html:`<p><b>Les règles permanentes</b> vont dans ce que vous écrivez : un projet, un profil, un Gem. Écrit une fois, appliqué à chaque fois, corrigeable quand c’est faux.</p>
+    <p><b>Les préférences</b>, comme votre style ou ce qui vous occupe ce trimestre, sont exactement ce que la mémoire automatique fait bien. Laissez-la faire, puis jetez un œil à la liste de temps en temps, parce qu’elle s’accumule.</p>
+    <p><b>Les faits sur le monde</b> relèvent de la recherche, jamais de la mémoire. Une note enregistrée sur un prix, une date ou une règle survivra à son exactitude sans jamais le signaler.</p>
+    <p><b>Tout ce qui est privé</b> ne relève par défaut ni de l’une ni de l’autre. Les deux produits offrent un interrupteur par conversation, incognito chez Claude et mode Temporaire chez Gemini, et placent les catégories sensibles derrière une activation distincte. Pour le médical, le financier ou le familial, ces interrupteurs sont faits pour ça.</p>`},
+   {t:"Une habitude à prendre",
+    html:`<p>Une fois par mois, ouvrez les réglages de mémoire et lisez ce qui a été enregistré sur vous. Cinq minutes, et cela vaut mieux que n’importe quelle technique de formulation, pour une raison simple : un fait faux en mémoire est faux dans toutes les conversations à venir, discrètement, sans jamais s’annoncer.</p>
+    <p>Ce qu’on gagne typiquement à supprimer : un métier que vous ne faites plus, une préférence exprimée une fois pour un seul document, une conclusion que l’assistant a tirée sur vous sans que vous l’ayez dite, et tout ce que vous n’aimeriez pas voir resurgir pendant un partage d’écran.</p>`}
+  ],
+  callout:`<b>Relisez votre propre mémoire une fois par mois.</b> Les deux produits permettent de voir et de supprimer chaque entrée. Cinq minutes de ménage valent mieux que n’importe quelle astuce de formulation : un fait faux là-dedans est faux partout, indéfiniment.`
+ }
+},
+/* ─────────────────────── 06 TOOLS ─────────────────────── */
+{
+ id:"tools", num:"07", scene:"tools", color:"var(--a6)",
+ en:{
+  title:"Giving it hands",
+  dek:"An assistant that can only talk is a very expensive conversation. Three things turn it into something that can actually do the job.",
+  body:[
+   `On its own, an assistant can only discuss your document. It cannot open it. Everything that closes that gap works the same way underneath: the machinery describes what is available, the model asks to use one of them, and the machinery does it and reports back.`,
+   `<b>Connections</b> are the first kind: your drive, your calendar, your email, a web browser. This is the single biggest upgrade available to most people, and the one most often left switched off. An assistant that can see the actual spreadsheet beats one working from a copy you pasted last Tuesday, every time. There is now a shared standard for these connections, which is why the same integration increasingly works in both Claude and Gemini.`,
+   `<b>Saved instructions for a recurring job</b> are the second. Claude calls them skills; Gemini's Gems do something similar. Think of a recipe card: written once, in plain language, for something you do repeatedly. &ldquo;When I give you a set of lecture notes, produce ten flashcards in this format, and flag anything that looks like it will be examined.&rdquo; The clever part is that these stay out of the way until they are relevant, so you can have dozens without slowing anything down.`,
+   `<b>Helpers</b> are the third. For a job that involves reading a lot and reporting a little, the assistant can send a separate copy of itself off to do the reading in its own conversation and come back with a summary. You mostly notice this as a research mode that goes away for two minutes and returns with something substantial.`
+  ],
+  figCaption:"The model can only produce text. The machinery around it turns that text into actions, and the last row is the only one the model does not get a say in.",
+  dives:[
+   {t:"Getting connections right",
+    html:`<p>Connections are where most of the value and all of the risk live, so a few habits are worth forming.</p>
+    <ul class="bul">
+      <li><b>Start with read-only.</b> Being able to see your calendar is most of the benefit; being able to change it is most of the risk.</li>
+      <li><b>Connect one thing at a time</b> and use it for a week before adding the next. You will learn what it is actually good at, which is rarely what you assumed.</li>
+      <li><b>Point at the source, not a copy.</b> The whole point is that it reads the live document.</li>
+      <li><b>Narrow the folder.</b> If the work lives in one folder, grant one folder. This is not only about security. A narrow scope also stops the assistant wandering into irrelevant files and confusing itself.</li>
+      <li><b>Keep approvals on for sending and deleting</b>, however tedious, until you have watched the same task go right several times.</li>
+    </ul>`},
+   {t:"If you build things",
+    html:`<p>The plain-language names above have technical ones, and the distinctions matter once you are building rather than using.</p>
+    <ul class="bul">
+      <li><b>MCP</b>, the Model Context Protocol, is the shared standard for connections. A service ships one server; any compliant client can use it. Claude, Cowork, Claude Code, Antigravity and Gemini Spark all speak it, so an integration written once works in both ecosystems.</li>
+      <li><b>Skills</b> are folders containing a <code>SKILL.md</code> plus any reference files and scripts. They work across claude.ai, Claude Code, the Agent SDK and the developer platform; Antigravity CLI carries its own equivalent.</li>
+      <li><b>Sub-agents</b> run their own loop in their own context window and return a summary. They are the mechanism behind the &ldquo;helpers&rdquo; above.</li>
+      <li><b>Hooks</b> fire on a lifecycle event and run regardless of what the model decides. Everything else on this page is a request; a hook is the only guarantee.</li>
+      <li><b>Plugins</b> bundle the lot into something installable, so a setup can be shared across repositories or across a team.</li>
+    </ul>
+    <p>The design idea worth stealing, even if you never write one, is <b>progressive disclosure</b>. A skill exposes only its name and description until the model judges it relevant; the body loads then, and its reference files only if the task reaches them. Almost none of it is resident, so the amount of expertise you can attach is effectively unlimited. You can apply the same principle by hand: keep your standing instructions to a short index of what exists and where, and let the assistant read the detail when it needs it. For a project instruction block that has grown bloated, that is the single highest-value edit.</p>`}
+  ],
+  callout:`<b>Connect something this week.</b> Most people are using one of these assistants at a fraction of its usefulness because it cannot see any of their actual material. One folder, read-only, is enough to feel the difference.`
+ },
+ fr:{
+  title:"Lui donner des mains",
+  dek:"Un assistant qui ne sait que parler est une conversation très coûteuse. Trois choses en font quelque chose qui fait vraiment le travail.",
+  body:[
+   `Seul, un assistant ne peut que discuter de votre document. Il ne peut pas l’ouvrir. Tout ce qui comble cet écart fonctionne pareil en dessous : la machinerie décrit ce qui est disponible, le modèle demande à s’en servir, la machinerie exécute et rend compte.`,
+   `Les <b>connexions</b> sont le premier type : votre drive, votre agenda, votre courrier, un navigateur. C’est le plus grand gain disponible pour la plupart des gens, et celui qu’on laisse le plus souvent désactivé. Un assistant qui voit le vrai tableur bat un assistant qui travaille sur une copie collée mardi dernier, à chaque fois. Il existe désormais un standard commun pour ces connexions, si bien que la même intégration fonctionne de plus en plus chez Claude comme chez Gemini.`,
+   `Les <b>instructions enregistrées pour une tâche récurrente</b> sont le deuxième. Claude les appelle des skills ; les Gems de Gemini font quelque chose d’approchant. Voyez cela comme une fiche recette : écrite une fois, en langage courant, pour ce que vous faites de façon répétée. &laquo;&nbsp;Quand je te donne un cours, produis dix fiches de révision dans ce format, et signale ce qui a l’air tombable à l’examen.&nbsp;&raquo; L’astuce est qu’elles restent en retrait tant qu’elles ne servent pas : vous pouvez en avoir des dizaines sans rien ralentir.`,
+   `Les <b>assistants de l’assistant</b> sont le troisième. Pour un travail qui demande de lire beaucoup et de rapporter peu, il peut envoyer une copie de lui-même lire dans sa propre conversation et revenir avec une synthèse. Vous le percevez surtout comme un mode recherche qui disparaît deux minutes et revient avec quelque chose de consistant.`
+  ],
+  figCaption:"Le modèle ne sait produire que du texte. La machinerie autour transforme ce texte en actions, et la dernière ligne est la seule sur laquelle le modèle n’a pas son mot à dire.",
+  dives:[
+   {t:"Bien gérer les connexions",
+    html:`<p>C’est dans les connexions que se trouvent l’essentiel de la valeur et la totalité du risque : quelques habitudes valent la peine.</p>
+    <ul class="bul">
+      <li><b>Commencez en lecture seule.</b> Voir votre agenda, c’est l’essentiel du bénéfice ; pouvoir le modifier, c’est l’essentiel du risque.</li>
+      <li><b>Connectez une chose à la fois</b> et servez-vous-en une semaine avant d’ajouter la suivante. Vous découvrirez ce à quoi elle sert vraiment, ce qui est rarement ce que vous aviez supposé.</li>
+      <li><b>Pointez la source, pas une copie.</b> Tout l’intérêt est qu’il lise le document vivant.</li>
+      <li><b>Restreignez le dossier.</b> Si le travail tient dans un dossier, n’accordez qu’un dossier. Ce n’est pas qu’une question de sécurité. Un périmètre étroit empêche aussi l’assistant d’errer dans des fichiers hors sujet et de s’embrouiller.</li>
+      <li><b>Gardez les validations pour l’envoi et la suppression</b>, aussi fastidieux soit-ce, tant que vous n’avez pas vu la même tâche réussir plusieurs fois.</li>
+    </ul>`},
+   {t:"Si vous développez",
+    html:`<p>Les noms courants ci-dessus en ont de techniques, et les distinctions comptent dès qu’on construit au lieu d’utiliser.</p>
+    <ul class="bul">
+      <li><b>MCP</b>, le Model Context Protocol, est le standard commun des connexions. Un service publie un serveur ; tout client conforme peut l’utiliser. Claude, Cowork, Claude Code, Antigravity et Gemini Spark le parlent tous : une intégration écrite une fois fonctionne dans les deux écosystèmes.</li>
+      <li>Les <b>skills</b> sont des dossiers contenant un <code>SKILL.md</code> plus des fichiers de référence et des scripts. Elles fonctionnent sur claude.ai, Claude Code, l’Agent SDK et la plateforme développeur ; Antigravity CLI a son équivalent.</li>
+      <li>Les <b>sous-agents</b> exécutent leur propre boucle dans leur propre fenêtre de contexte et renvoient une synthèse. C’est le mécanisme derrière les &laquo;&nbsp;assistants de l’assistant&nbsp;&raquo; ci-dessus.</li>
+      <li>Les <b>hooks</b> se déclenchent sur un événement de cycle de vie et s’exécutent quoi que décide le modèle. Tout le reste de cette page est une demande ; le hook est la seule garantie.</li>
+      <li>Les <b>plugins</b> empaquettent l’ensemble en une unité installable, pour partager une configuration entre dépôts ou au sein d’une équipe.</li>
+    </ul>
+    <p>L’idée de conception à voler, même sans jamais en écrire une, est la <b>divulgation progressive</b>. Une skill n’expose que son nom et sa description tant que le modèle ne la juge pas pertinente ; le corps se charge alors, et ses fichiers de référence seulement si la tâche y touche. Presque rien ne réside en mémoire : la quantité d’expertise attachable est donc pratiquement illimitée. Vous pouvez appliquer le principe à la main : réduisez vos instructions permanentes à un index court de ce qui existe et où, et laissez l’assistant lire le détail au besoin. Pour un bloc d’instructions de projet devenu obèse, c’est la modification la plus rentable.</p>`}
+  ],
+  callout:`<b>Connectez quelque chose cette semaine.</b> La plupart des gens utilisent ces assistants à une fraction de leur utilité, parce qu’ils ne voient aucun de leurs vrais documents. Un dossier, en lecture seule, suffit à sentir la différence.`
+ }
+},
+/* ─────────────────────── 07 CLAUDE ─────────────────────── */
+{
+ id:"claude", num:"08", scene:"cards", color:"var(--a7)",
+ en:{
+  title:"The Claude side",
+  dek:"One family of models behind four rather different front doors, and since September 2026 you no longer have to choose between the first two.",
+  body:[
+   `On 16 September 2026 Anthropic folded its agent product, Cowork, into the main Claude app. Chat, Cowork and Design became one thing that sends your request to whichever part suits it, instead of asking you to pick a tab first. Claude Slides and Claude Docs arrived at the same time. Claude Code, which is for programmers, stayed separate.`,
+   `What this means in practice is that you no longer decide between &ldquo;chatting&rdquo; and &ldquo;setting an agent loose&rdquo;. You decide how much access and how much independence to grant, and the product works out the rest. What is still worth knowing is what sits behind each door.`
+  ],
+  cards:[
+   {n:"Claude",s:"Conversation · web, desktop, phone",c:"var(--a7)",
+    p:"The thinking-and-writing surface. Fast, nothing happens to your files, nothing to undo. Projects give it standing instructions and a memory of their own.",
+    li:["Best for: working something out, drafting, explaining, one-off analysis","Artifacts, Slides and Docs for things you want to keep or share","Since September 2026 it steps up into Cowork by itself when the job needs your files"]},
+   {n:"Cowork",s:"Doing the work · desktop, web and phone in beta",c:"var(--a6)",
+    p:"Give it a goal rather than a message. It works through the folders and accounts you have allowed, shows each step, and asks before anything significant.",
+    li:["Reads, edits and creates files in folders you choose","Connects to Drive, Slack, Microsoft 365 and others","Can run to a schedule, and keeps going while your laptop is shut","Has its own browser, kept apart from yours","You can watch and redirect it from your phone"]},
+   {n:"Claude Code",s:"For writing software · terminal, editor",c:"var(--a2)",
+    p:"Built around a code repository, for people who write software. The most capable of the four, and the one that expects the most setup.",
+    li:["A file of project conventions it reads every session","Saved workflows, helper agents, enforced rules","Connections, a sandbox, and the ability to undo","Not only for code, but it assumes you have a repository"]},
+   {n:"Build your own",s:"Agent SDK and API",c:"var(--a3)",
+    p:"The same machinery Claude Code runs on, published as a library. For when the tool you want does not exist yet.",
+    li:["Your own tools, your own permission rules","Where developers go once the apps stop fitting","Not something you need unless you are writing software"]}
+  ],
+  figCaption:"Four ways in. Independence and access increase from left to right; so does how much setting up you have to do yourself.",
+  dives:[
+   {t:"Which one, for what",
+    html:`<p>The official line is that Claude Code does software and Cowork does everything else. True, but there is a sharper way to choose: <b>ask where the work ends up.</b></p>
+    <p>If it ends in a <b>decision or an explanation</b>, stay in the conversation. If it ends in a <b>document, a spreadsheet, a tidied folder or a message sent</b>, that is Cowork. If it ends in <b>code committed to a repository</b>, that is Claude Code.</p>
+    <p>And if you are not sure, start in the conversation. It is the cheapest place to find out what you actually want, and since September the app will escalate on its own when the job outgrows it.</p>`},
+   {t:"Getting good results from Cowork",
+    html:`<ul class="bul">
+      <li><b>Choose the smallest folder that contains the job.</b> Access is the main thing you control, and a narrow folder also keeps it from wandering.</li>
+      <li><b>Give it a finish line.</b> &ldquo;Go through these two bank exports and list every payment that appears in one and not the other, with the date and amount&rdquo; works. &ldquo;Have a look at these files&rdquo; does not.</li>
+      <li><b>Keep approvals on for anything that sends or deletes</b> until you have watched that exact task succeed a few times. Then relax it for that task, not for everything.</li>
+      <li><b>Schedule the things you would otherwise forget</b>, and read the first three runs properly. An unattended assistant repeats a misunderstanding rather than noticing it.</li>
+      <li><b>Let it read the real file.</b> A connection to the live spreadsheet beats a copy that was correct last week.</li>
+    </ul>`}
+  ],
+  callout:`<b>Independence is a dial, not a product.</b> The same job can be a conversation you steer sentence by sentence, an assistant you approve step by step, or something scheduled that you only read the output of. Start at the left and move right once you have seen it work.`
+ },
+ fr:{
+  title:"Le côté Claude",
+  dek:"Une même famille de modèles derrière quatre portes assez différentes, et depuis septembre 2026 il n’y a plus besoin de choisir entre les deux premières.",
+  body:[
+   `Le 16 septembre 2026, Anthropic a intégré son produit agent, Cowork, dans l’application Claude principale. Chat, Cowork et Design sont devenus une seule chose qui oriente votre demande vers la partie qui convient, au lieu de vous faire choisir un onglet d’abord. Claude Slides et Claude Docs sont arrivés en même temps. Claude Code, destiné aux programmeurs, est resté à part.`,
+   `Concrètement, vous ne choisissez plus entre &laquo;&nbsp;discuter&nbsp;&raquo; et &laquo;&nbsp;lâcher un agent&nbsp;&raquo;. Vous choisissez quel accès et quelle indépendance accorder, et le produit se débrouille du reste. Ce qui reste utile à savoir, c’est ce qu’il y a derrière chaque porte.`
+  ],
+  cards:[
+   {n:"Claude",s:"Conversation · web, bureau, téléphone",c:"var(--a7)",
+    p:"La surface où l’on réfléchit et où l’on écrit. Rapide, rien n’arrive à vos fichiers, rien à défaire. Les Projets lui donnent des instructions permanentes et une mémoire propre.",
+    li:["Idéal pour : démêler une question, rédiger, expliquer, analyser ponctuellement","Artifacts, Slides et Docs pour ce que vous voulez garder ou partager","Depuis septembre 2026, il bascule tout seul vers Cowork quand la tâche exige vos fichiers"]},
+   {n:"Cowork",s:"Faire le travail · bureau, web et téléphone en bêta",c:"var(--a6)",
+    p:"Donnez-lui un objectif plutôt qu’un message. Il travaille dans les dossiers et comptes que vous avez autorisés, montre chaque étape, et demande avant toute action notable.",
+    li:["Lit, modifie et crée des fichiers dans les dossiers que vous choisissez","Se connecte à Drive, Slack, Microsoft 365 et d’autres","Peut tourner à heure fixe, et continue portable fermé","A son propre navigateur, séparé du vôtre","Vous pouvez le suivre et le réorienter depuis votre téléphone"]},
+   {n:"Claude Code",s:"Pour écrire du logiciel · terminal, éditeur",c:"var(--a2)",
+    p:"Construit autour d’un dépôt de code, pour ceux qui programment. Le plus capable des quatre, et celui qui demande le plus de configuration.",
+    li:["Un fichier de conventions qu’il relit à chaque session","Procédures enregistrées, agents auxiliaires, règles imposées","Connexions, bac à sable, possibilité de revenir en arrière","Pas réservé au code, mais il suppose que vous avez un dépôt"]},
+   {n:"Construire le vôtre",s:"Agent SDK et API",c:"var(--a3)",
+    p:"La machinerie même de Claude Code, publiée en bibliothèque. Pour quand l’outil que vous voulez n’existe pas encore.",
+    li:["Vos propres outils, vos propres règles de permission","Là où vont les développeurs quand les applications ne suffisent plus","Inutile si vous ne programmez pas"]}
+  ],
+  figCaption:"Quatre entrées. L’indépendance et l’accès augmentent de gauche à droite ; la configuration à faire soi-même aussi.",
+  dives:[
+   {t:"Laquelle, pour quoi",
+    html:`<p>La ligne officielle veut que Claude Code fasse le logiciel et Cowork tout le reste. C’est vrai, mais il existe un critère plus net : <b>demandez-vous où finit le travail.</b></p>
+    <p>S’il finit en <b>décision ou en explication</b>, restez dans la conversation. S’il finit en <b>document, tableur, dossier rangé ou message envoyé</b>, c’est Cowork. S’il finit en <b>code déposé dans un dépôt</b>, c’est Claude Code.</p>
+    <p>Et dans le doute, commencez par la conversation. C’est l’endroit le moins cher pour découvrir ce que vous voulez vraiment, et depuis septembre l’application monte d’elle-même en puissance quand la tâche la dépasse.</p>`},
+   {t:"Tirer quelque chose de bon de Cowork",
+    html:`<ul class="bul">
+      <li><b>Choisissez le plus petit dossier qui contient le travail.</b> L’accès est la variable principale que vous maîtrisez, et un périmètre étroit l’empêche d’errer.</li>
+      <li><b>Donnez-lui une ligne d’arrivée.</b> &laquo;&nbsp;Passe ces deux relevés et liste chaque paiement qui figure dans l’un et pas dans l’autre, avec la date et le montant&nbsp;&raquo; fonctionne. &laquo;&nbsp;Jette un œil à ces fichiers&nbsp;&raquo; non.</li>
+      <li><b>Gardez les validations pour ce qui envoie ou supprime</b> tant que vous n’avez pas vu cette tâche précise réussir plusieurs fois. Puis assouplissez pour elle, pas pour tout.</li>
+      <li><b>Programmez ce que vous oublieriez</b>, et lisez sérieusement les trois premières exécutions. Un assistant non surveillé répète un malentendu au lieu de le remarquer.</li>
+      <li><b>Laissez-le lire le vrai fichier.</b> Une connexion au tableur vivant vaut mieux qu’une copie exacte la semaine dernière.</li>
+    </ul>`}
+  ],
+  callout:`<b>L’indépendance est un curseur, pas un produit.</b> Le même travail peut être une conversation pilotée phrase par phrase, un assistant validé étape par étape, ou une tâche programmée dont vous lisez seulement le résultat. Commencez à gauche, avancez quand vous avez vu que ça marche.`
+ }
+},
+/* ─────────────────────── 08 GEMINI ─────────────────────── */
+{
+ id:"gemini", num:"09", scene:"cards", color:"var(--a2)",
+ en:{
+  title:"The Gemini side",
+  dek:"Google's bet is different: the assistant lives in the cloud, inside the accounts you already have, and you reach it the way you reach a colleague.",
+  body:[
+   `Google announced <b>Gemini Spark</b> in May 2026: a personal assistant that runs around the clock on Google's servers rather than on your device, so it carries on working when you shut the laptop. It is wired deeply into Gmail, Docs and the rest of Workspace, and browses through Chrome. On Android, a feature called Halo shows you what it is doing. It needs the AI Ultra subscription, at $100 a month, US-only when it launched.`,
+   `The detail worth noticing is the way you talk to it: <b>Spark has its own email address.</b> You email your assistant, and it emails you back. That is a genuinely different relationship from a chat window, and it makes handing something over feel like handing something over.`,
+   `For most people, though, the everyday Gemini app is the thing, and it has four features worth learning properly rather than four hundred worth skimming: Gems, Deep Research, Canvas, and the memory described earlier.`,
+   `One last thing, because the version numbers mislead. Google's <b>Flash</b> line has moved fast: 3.5 in May, 3.6 in July, 3.7 in August, 3.8 in September. The <b>Pro</b> flagship has not moved since February: Gemini 3.1 Pro is still a preview, and the promised 3.5 Pro never shipped. So when someone says &ldquo;Gemini 3.7&rdquo;, they mean Flash. There is no Pro at that number.`
+  ],
+  cards:[
+   {n:"Gemini app",s:"Conversation · web, phone, Workspace",c:"var(--a2)",
+    p:"The everyday surface, and the one most people should actually invest an hour in.",
+    li:["Gems: a saved assistant with a role, a job, background and a format, plus up to ten reference files","Deep Research: goes away and reads hundreds of sources, then comes back with something cited","Canvas: edit a document side by side instead of regenerating the whole thing","Remembers across conversations on personal accounts; Temporary Chat when you would rather it did not"]},
+   {n:"Gemini Spark",s:"Always-on assistant · AI Ultra",c:"var(--a1)",
+    p:"An assistant with an inbox. Runs on Google's servers day and night, acts inside your Google account, and reports back.",
+    li:["Email it at its own address; it can watch yours","Recurring jobs, and behaviours you teach it once","Permissions start switched off; you grant each app deliberately","Connects to outside services like Canva and OpenTable","Halo on Android shows progress as it works"]},
+   {n:"Antigravity",s:"For writing software · desktop",c:"var(--a4)",
+    p:"Google's programming environment, built around agents rather than autocomplete. One view for working with a single agent, another for running several at once.",
+    li:["Agents hand back plans, task lists and recordings you can check","Uses the editor, the terminal and a built-in browser","Runs Gemini 3.8 Flash and 3.1 Pro, and also Claude"]},
+   {n:"Antigravity CLI",s:"Terminal and library",c:"var(--a5)",
+    p:"The same agents from a terminal, plus a library for building your own. Of interest mainly if you write software.",
+    li:["Replaced Gemini CLI in June 2026","Agents run in the background without blocking you","Saved instructions, enforced rules, helper agents, plugins"]}
+  ],
+  figCaption:"Four ways in. Notice how much is assumed rather than configured. With a Google account, the connections are already there.",
+  dives:[
+   {t:"Reading the Gemini version numbers",
+    html:`<p>The release cadence tells you where Google's effort is going, and it is not where the branding suggests.</p>
+    <ul class="bul">
+      <li><b>Flash, 2026:</b> 3.5 in May, 3.6 and a cheaper Flash-Lite in July, 3.7 in August at half the previous price, 3.8 in September, all pitched at long-running work and agents. Gemini 3.8 Live arrived the same month for voice.</li>
+      <li><b>Pro:</b> last substantive update February 2026. Gemini 3.1 Pro is still labelled a preview, and the 3.5 Pro that was promised has never appeared. Bloomberg reported it was struggling to meet internal targets; Google has stayed vague while training Gemini 4, and may skip 3.5 Pro entirely.</li>
+    </ul>
+    <p>Two things follow. The cheaper everyday tier is now where new capability lands first, so judging Google on its flagship understates what its products actually run on. And a version number alone is ambiguous, so always say which line you mean.</p>
+    <p>One release worth knowing if you work in security: <b>Gemini 3.5 Flash Cyber</b>, tuned for finding and fixing vulnerabilities, shipped in July 2026 to governments and trusted partners only, as a limited pilot. It is not generally available.</p>`},
+   {t:"Getting good results from the Gemini app",
+    html:`<ul class="bul">
+      <li><b>Build a Gem instead of repeating yourself.</b> Its four fields, role and job and background and format, are a good structure for any request, and the files you attach become permanent context. This is the closest thing Gemini has to a project.</li>
+      <li><b>Use Deep Research for breadth, not for judgement.</b> It will read hundreds of sources and cite them. Deciding which ones to believe is still your job, especially where they disagree.</li>
+      <li><b>Switch to Canvas the moment you are editing rather than generating.</b> Selecting a paragraph and asking for a change is faster, cheaper and far more predictable than regenerating the document and hoping the good bits survive.</li>
+      <li><b>Remember that Gems do not use your memory.</b> A Gem needs its context written into it explicitly.</li>
+      <li><b>Check what influenced an answer</b> with the previous-chats marker, whenever a reply seems to know something you did not just tell it.</li>
+    </ul>`},
+   {t:"Where the two philosophies differ",
+    html:`<p><b>Google assumes the account; Anthropic assumes the material.</b> Spark's advantage is that Gmail, Docs, Drive and Calendar are already connected with nothing to set up, and it runs whether or not your machine is on. Cowork's advantage is that it works on whatever folders and tools you nominate, including ones Google does not own, and it runs where you can watch it.</p>
+    <p><b>Google is building a place to go; Anthropic is building a layer to add.</b> Antigravity is an application you move into. Claude Code runs inside the editor and terminal you already have. Neither is obviously right, and for most people the deciding factor is simply where their documents already live.</p>
+    <p><b>Both have converged on the same ideas.</b> Saved instructions, helper agents, enforced rules, a shared connection standard: the vocabulary is now common to both. Learning it once transfers.</p>`}
+  ],
+  callout:`<b>Grant access the way you would to someone new.</b> Spark starts with everything switched off, which is the right default. Add one connection, watch it work for a while, then add the next, and keep the ability to send and delete until last.`
+ },
+ fr:{
+  title:"Le côté Gemini",
+  dek:"Le pari de Google est différent : l’assistant vit dans le cloud, à l’intérieur des comptes que vous avez déjà, et vous le joignez comme un collègue.",
+  body:[
+   `Google a annoncé <b>Gemini Spark</b> en mai 2026 : un assistant personnel qui tourne en continu sur les serveurs de Google plutôt que sur votre appareil, et continue donc à travailler quand vous fermez le portable. Il est profondément intégré à Gmail, Docs et au reste de Workspace, et navigue via Chrome. Sur Android, une fonction nommée Halo montre ce qu’il est en train de faire. Il exige l’abonnement AI Ultra, à 100&nbsp;$ par mois, réservé aux États-Unis au lancement.`,
+   `Le détail à remarquer est la façon dont on lui parle : <b>Spark a sa propre adresse e-mail.</b> Vous écrivez à votre assistant, il vous répond. C’est une relation réellement différente d’une fenêtre de chat, et déléguer y ressemble enfin à déléguer.`,
+   `Pour la plupart des gens, cela dit, c’est l’application Gemini quotidienne qui compte, et elle a quatre fonctions qu’il vaut mieux apprendre sérieusement plutôt que quatre cents à survoler : Gems, Deep Research, Canvas, et la mémoire décrite plus haut.`,
+   `Un dernier point, parce que les numéros de version induisent en erreur. La gamme <b>Flash</b> de Google avance vite : 3.5 en mai, 3.6 en juillet, 3.7 en août, 3.8 en septembre. Le vaisseau amiral <b>Pro</b>, lui, n’a pas bougé depuis février : Gemini 3.1 Pro est toujours en préversion, et le 3.5 Pro promis n’est jamais sorti. Donc quand quelqu’un dit &laquo;&nbsp;Gemini 3.7&nbsp;&raquo;, il parle de Flash. Il n’existe pas de Pro à ce numéro.`
+  ],
+  cards:[
+   {n:"Application Gemini",s:"Conversation · web, téléphone, Workspace",c:"var(--a2)",
+    p:"La surface du quotidien, et celle dans laquelle il vaut vraiment la peine d’investir une heure.",
+    li:["Gems : un assistant enregistré avec un rôle, une mission, un contexte et un format, plus jusqu’à dix fichiers de référence","Deep Research : part lire des centaines de sources et revient avec un texte sourcé","Canvas : modifier un document côte à côte au lieu de tout régénérer","Se souvient d’une conversation à l’autre sur un compte personnel ; mode Temporaire quand vous préférez que non"]},
+   {n:"Gemini Spark",s:"Assistant permanent · AI Ultra",c:"var(--a1)",
+    p:"Un assistant avec une boîte mail. Tourne sur les serveurs de Google jour et nuit, agit dans votre compte Google, et vous rend compte.",
+    li:["Écrivez-lui à sa propre adresse ; il peut surveiller la vôtre","Tâches récurrentes, et comportements qu’on lui apprend une fois","Les permissions démarrent désactivées ; vous accordez chaque application délibérément","Se connecte à des services extérieurs comme Canva ou OpenTable","Halo, sur Android, montre la progression"]},
+   {n:"Antigravity",s:"Pour écrire du logiciel · bureau",c:"var(--a4)",
+    p:"L’environnement de programmation de Google, construit autour des agents plutôt que de l’autocomplétion. Une vue pour travailler avec un agent, une autre pour en faire tourner plusieurs.",
+    li:["Les agents rendent des plans, des listes de tâches et des enregistrements vérifiables","Utilise l’éditeur, le terminal et un navigateur intégré","Fait tourner Gemini 3.8 Flash et 3.1 Pro, et aussi Claude"]},
+   {n:"Antigravity CLI",s:"Terminal et bibliothèque",c:"var(--a5)",
+    p:"Les mêmes agents depuis un terminal, plus une bibliothèque pour bâtir les vôtres. Intéressant surtout si vous développez.",
+    li:["A remplacé Gemini CLI en juin 2026","Les agents tournent en arrière-plan sans vous bloquer","Instructions enregistrées, règles imposées, agents auxiliaires, plugins"]}
+  ],
+  figCaption:"Quatre entrées. Notez la part de choses présupposées plutôt que configurées. Avec un compte Google, les connexions sont déjà là.",
+  dives:[
+   {t:"Lire les numéros de version de Gemini",
+    html:`<p>La cadence des sorties indique où va l’effort de Google, et ce n’est pas là où la marque le suggère.</p>
+    <ul class="bul">
+      <li><b>Flash, 2026 :</b> 3.5 en mai, 3.6 et un Flash-Lite moins cher en juillet, 3.7 en août à moitié prix du précédent, 3.8 en septembre, tous positionnés sur le travail au long cours et les agents. Gemini 3.8 Live est arrivé le même mois pour la voix.</li>
+      <li><b>Pro :</b> dernière mise à jour substantielle en février 2026. Gemini 3.1 Pro porte toujours l’étiquette préversion, et le 3.5 Pro promis n’est jamais apparu. Bloomberg a rapporté qu’il peinait à atteindre ses objectifs internes ; Google reste évasif tout en entraînant Gemini 4, et pourrait sauter le 3.5 Pro.</li>
+    </ul>
+    <p>Deux conséquences. C’est désormais la gamme économique du quotidien qui reçoit les nouveautés en premier : juger Google sur son vaisseau amiral sous-estime ce que ses produits font réellement tourner. Et un numéro de version seul est ambigu, précisez donc toujours la gamme.</p>
+    <p>Une sortie à connaître si vous travaillez en sécurité : <b>Gemini 3.5 Flash Cyber</b>, réglé pour détecter et corriger des vulnérabilités, livré en juillet 2026 aux seuls gouvernements et partenaires de confiance, en pilote restreint. Il n’est pas disponible publiquement.</p>`},
+   {t:"Tirer quelque chose de bon de l’application Gemini",
+    html:`<ul class="bul">
+      <li><b>Construisez un Gem au lieu de vous répéter.</b> Ses quatre champs, rôle et mission et contexte et format, forment une bonne structure pour n’importe quelle demande, et les fichiers joints deviennent du contexte permanent. C’est ce qui se rapproche le plus d’un projet chez Gemini.</li>
+      <li><b>Utilisez Deep Research pour la largeur, pas pour le jugement.</b> Il lira des centaines de sources et les citera. Décider lesquelles croire reste votre travail, surtout quand elles divergent.</li>
+      <li><b>Passez à Canvas dès que vous modifiez au lieu de générer.</b> Sélectionner un paragraphe et demander un changement est plus rapide, moins cher et bien plus prévisible que régénérer le document en espérant que les bons passages survivent.</li>
+      <li><b>Rappelez-vous que les Gems n’utilisent pas la mémoire.</b> Un Gem doit contenir son contexte explicitement.</li>
+      <li><b>Vérifiez ce qui a influencé une réponse</b> via le repère des conversations précédentes, chaque fois qu’une réponse semble savoir ce que vous ne venez pas de dire.</li>
+    </ul>`},
+   {t:"Où les deux philosophies divergent",
+    html:`<p><b>Google présuppose le compte ; Anthropic présuppose la matière.</b> L’avantage de Spark, c’est que Gmail, Docs, Drive et Agenda sont déjà connectés sans rien à configurer, et qu’il tourne que votre machine soit allumée ou non. L’avantage de Cowork, c’est qu’il travaille sur les dossiers et outils que vous désignez, y compris ceux que Google ne possède pas, et qu’il s’exécute là où vous le voyez.</p>
+    <p><b>Google construit un lieu où aller ; Anthropic construit une couche à ajouter.</b> Antigravity est une application dans laquelle on emménage. Claude Code s’exécute dans l’éditeur et le terminal qu’on a déjà. Aucun n’a manifestement raison, et pour la plupart des gens le critère décisif est simplement l’endroit où vivent déjà leurs documents.</p>
+    <p><b>Les deux ont convergé sur les mêmes idées.</b> Instructions enregistrées, agents auxiliaires, règles imposées, standard de connexion commun : le vocabulaire est désormais partagé. L’apprendre une fois est transférable.</p>`}
+  ],
+  callout:`<b>Accordez les accès comme à quelqu’un de nouveau.</b> Spark démarre tout désactivé, ce qui est le bon défaut. Ajoutez une connexion, regardez-la travailler un moment, puis passez à la suivante, en gardant pour la fin le droit d’envoyer et de supprimer.`
+ }
+},
+/* ─────────────────────── 09 COMPARE ─────────────────────── */
+{
+ id:"compare", num:"10", scene:"matrix", color:"var(--a3)",
+ en:{
+  title:"Side by side",
+  dek:"The five questions from earlier, answered for each of them.",
+  body:[
+   `Read this by row rather than by column. Each row is one of the questions worth asking about any assistant: what it can touch, where it runs, what it remembers, when it asks permission. The differences along a single row tell you far more than any overall ranking would.`
+  ],
+  matrix:{
+   cols:["","Claude","Cowork","Claude Code","Gemini app","Gemini Spark","Antigravity"],
+   rows:[
+    ["Runs on","Their servers","Your computer; their servers on web and phone","Your computer","Their servers","Google's servers, day and night","Your computer"],
+    ["Can touch","Attachments, connections, the web","Folders you choose, connections, its own browser","Your code, your files, your terminal","Workspace, the web, attachments","Gmail, Docs, Drive, Chrome, some outside services","Your code, terminal, browser"],
+    ["You set up once","Project instructions","Project instructions and connections","A conventions file, saved workflows","Gems, saved information","Taught behaviours and permissions","Agent setup, saved workflows"],
+    ["Remembers","Facts about you; separate memory per project","The same, plus the files on disk","A file you wrote and can edit","Past conversations, personal accounts only","Carries on across sessions","Learns from earlier work"],
+    ["Asks permission","Not needed; nothing happens","Before anything significant; watch it live","Per action, with rules you can enforce","Not needed in chat","Everything off until you allow it","Per agent, with work to review"],
+    ["Best at","Thinking, drafting, explaining","Multi-step work on your own documents","Serious work in a codebase","Research and anything inside Google","Handing something over and walking away","Running several coding agents"],
+    ["Worst at","Anything that changes a file","Work that belongs in version control","Anything that is not software","Long unattended jobs","Anything outside your Google account","Being simple"]
+   ]
+  },
+  figCaption:"September 2026. Availability and subscription requirements change often, so check before committing to any single row.",
+  dives:[
+   {t:"If you only learn two",
+    html:`<p>For most people the pair that covers the widest ground is <b>Claude</b> and <b>the Gemini app</b>. One is better at thinking a problem through with you and at working over documents you keep yourself; the other is already inside your mail and your drive and is stronger at research. Between them you are well covered, and neither requires you to learn anything technical.</p>
+    <p>If you write software, it is <b>Claude Code</b> plus whichever of the two your material already lives near.</p>
+    <p>The honest caveat: which model leads on benchmarks changes every few months, and both companies copy each other's good ideas within a release or two. Choose on where your documents live, what you are comfortable granting access to, and which one you find pleasant to talk to, not on last month's scores.</p>`}
+  ]
+ },
+ fr:{
+  title:"Côte à côte",
+  dek:"Les cinq questions de tout à l’heure, appliquées à chacun.",
+  body:[
+   `Lisez ce tableau par ligne plutôt que par colonne. Chaque ligne correspond à une question qu’il vaut la peine de poser à n’importe quel assistant : à quoi il a accès, où il s’exécute, ce qu’il retient, quand il demande la permission. Les écarts sur une même ligne en disent bien plus que n’importe quel classement général.`
+  ],
+  matrix:{
+   cols:["","Claude","Cowork","Claude Code","Appli Gemini","Gemini Spark","Antigravity"],
+   rows:[
+    ["S’exécute sur","Leurs serveurs","Votre ordinateur ; leurs serveurs sur web et mobile","Votre ordinateur","Leurs serveurs","Les serveurs de Google, jour et nuit","Votre ordinateur"],
+    ["A accès à","Pièces jointes, connexions, le web","Les dossiers que vous choisissez, connexions, son navigateur","Votre code, vos fichiers, votre terminal","Workspace, le web, pièces jointes","Gmail, Docs, Drive, Chrome, quelques services externes","Votre code, terminal, navigateur"],
+    ["Se règle une fois","Instructions de projet","Instructions de projet et connexions","Un fichier de conventions, des procédures enregistrées","Gems, informations enregistrées","Comportements appris et permissions","Configuration d’agent, procédures"],
+    ["Retient","Des faits sur vous ; mémoire séparée par projet","Idem, plus les fichiers sur le disque","Un fichier que vous avez écrit et pouvez modifier","Les conversations passées, comptes personnels seulement","Continue d’une session à l’autre","Apprend du travail précédent"],
+    ["Demande la permission","Inutile ; rien ne se produit","Avant toute action notable ; suivi en direct","Par action, avec des règles imposables","Inutile en conversation","Tout est fermé tant que vous n’ouvrez pas","Par agent, avec du travail à relire"],
+    ["Meilleur pour","Réfléchir, rédiger, expliquer","Le travail multi-étapes sur vos propres documents","Le travail de fond dans une base de code","La recherche et tout ce qui est chez Google","Confier quelque chose et s’en aller","Faire tourner plusieurs agents de code"],
+    ["Plus faible pour","Tout ce qui modifie un fichier","Ce qui relève du contrôle de version","Tout ce qui n’est pas du logiciel","Les tâches longues non surveillées","Tout ce qui sort de votre compte Google","La simplicité"]
+   ]
+  },
+  figCaption:"Septembre 2026. Disponibilité et conditions d’abonnement changent souvent, vérifiez donc avant de vous engager sur une ligne.",
+  dives:[
+   {t:"Si vous n’en apprenez que deux",
+    html:`<p>Pour la plupart des gens, le duo qui couvre le plus de terrain est <b>Claude</b> et l’<b>application Gemini</b>. L’un est meilleur pour démêler un problème avec vous et pour travailler sur des documents que vous gardez vous-même ; l’autre est déjà dans votre courrier et votre drive, et plus fort en recherche. À eux deux, vous êtes bien couvert, et aucun ne demande d’apprendre quoi que ce soit de technique.</p>
+    <p>Si vous programmez, c’est <b>Claude Code</b> plus celui des deux dont vos documents sont déjà voisins.</p>
+    <p>La réserve honnête : le modèle en tête des benchmarks change tous les quelques mois, et les deux éditeurs se copient les bonnes idées en une ou deux versions. Choisissez selon l’endroit où vivent vos documents, ce que vous acceptez de laisser voir, et celui avec lequel vous aimez parler, pas selon les scores du mois dernier.</p>`}
+  ]
+ }
+},
+/* ─────────────────────── 10 PRACTICE ─────────────────────── */
+{
+ id:"practice", num:"11", scene:"plays", color:"var(--a1)",
+ en:{
+  title:"How to actually use it",
+  dek:"Seven situations, and the thing that genuinely changes the outcome in each, plus one for the programmers.",
+  body:[
+   `Clever phrasings go out of date. What lasts is structural: say what you want and who it is for, give the assistant the material rather than a description of the material, and match how much you let it do on its own to how easy the result is to undo.`
+  ],
+  pc:{badH:"Costs more, works less",goodH:"Costs less, works better",
+   bad:"Hi! Can you help me choose between these two quotes? I'll paste them. Actually here's the first one. And we also care a lot about not being locked in for ages. Can you be thorough and make sure you don't miss anything important?",
+   good:"Two quotes for the same job are attached.\nWe are a family of four, we plan to stay in this house for at least ten years, and being locked into a long contract matters more to us than saving a little each month.\nGive me a table: what each one includes, what each one leaves out, total cost over five years, and how easily we could leave.\nThen tell me which you would choose and what would change your mind.\nIf something isn't stated in the quotes, say so rather than assuming."},
+  plays:[
+   {t:"Getting an answer you can trust",
+    html:`<ol>
+      <li><b>Say what you want in the first sentence.</b> Everything after that is context for it. Assistants are bad at guessing which part of a long message was the actual question.</li>
+      <li><b>Say what the answer should look like</b>: a table, three bullet points, one paragraph, a straight recommendation. It is the cheapest instruction you can give and the one most often left out.</li>
+      <li><b>Say who it is for.</b> &ldquo;Explain it to someone who has never done this&rdquo; changes the answer more than any adjective.</li>
+      <li><b>Give it permission not to know.</b> Adding &ldquo;if you are not sure, say so&rdquo; measurably reduces confident invention. Nothing else you can type helps this much.</li>
+      <li><b>Check one thing you already know.</b> Ten seconds, and it tells you how much to trust the rest.</li>
+    </ol>`},
+   {t:"Learning and revising",
+    html:`<p>This is where these tools are at their most genuinely useful, and where they are most often used badly. The bad way is to ask for a summary and read it. The good way is to make it ask <em>you</em> things.</p>
+    <ol>
+      <li><b>Ask to be tested, not told.</b> &ldquo;Ask me five questions on this chapter, one at a time, and don't give me the answer until I have tried.&rdquo; Being asked is what makes it stick; being told is not.</li>
+      <li><b>Ask for the same idea three ways</b>: a plain explanation, an analogy, and a worked example. If one of them lands, you have understood it; if none do, you have found what to ask your teacher.</li>
+      <li><b>Paste your own attempt and ask what is wrong with it</b> rather than asking for the answer. &ldquo;Here is my argument. Where is it weakest?&rdquo;</li>
+      <li><b>Ask it to be honest rather than encouraging.</b> Say so explicitly: &ldquo;Don't tell me it's good if it isn't. Tell me the single biggest problem.&rdquo;</li>
+      <li><b>Be careful with facts, relaxed with explanation.</b> It is excellent at explaining something you can then verify, and confident about dates, figures and citations that occasionally do not exist. For anything you will be marked on, check the source.</li>
+    </ol>`},
+   {t:"Writing something that sounds like you",
+    html:`<ol>
+      <li><b>Give it two things you have written</b> and ask it to work out how you write before it drafts anything. This is far more effective than describing your style.</li>
+      <li><b>Agree the outline before the prose.</b> Fixing an outline costs a sentence; fixing a finished letter costs the whole letter.</li>
+      <li><b>Never send the first draft.</b> Not because it is bad, but because it is generic, and the thing that makes a letter work is usually the specific detail only you know.</li>
+      <li><b>Edit in place rather than regenerating.</b> Ask it to change one paragraph. Asking again from scratch re-rolls the parts you liked.</li>
+      <li><b>Say what you want the reader to feel or do.</b> A complaint that wants an apology reads differently from one that wants a refund, and it cannot guess which you are after.</li>
+    </ol>`},
+   {t:"Comparing options and deciding",
+    html:`<ol>
+      <li><b>State your constraints before asking.</b> Budget, timeframe, what you will not compromise on. Without them you get a balanced overview of things you cannot use.</li>
+      <li><b>Ask for the case against your preference.</b> &ldquo;I am leaning towards the first one. Argue me out of it.&rdquo; These assistants have a strong pull towards agreeing with you, and this is the simplest way to counteract it.</li>
+      <li><b>Separate finding from judging.</b> Ask for the facts and sources first, and for a recommendation second. Mixed together, you get confident prose resting on thin evidence.</li>
+      <li><b>Ask what would change the answer.</b> &ldquo;What would have to be true for the other option to win?&rdquo; This is more useful than the recommendation itself.</li>
+      <li><b>For anything medical, legal or financial, treat it as preparation, not advice.</b> It is genuinely good at explaining what a document means and what questions to ask a professional. That is a real service. It is not the professional.</li>
+    </ol>`},
+   {t:"Documents, files and admin",
+    html:`<p>This is what the agent products are actually for, and the first place most people feel the difference.</p>
+    <ol>
+      <li><b>Let it read the real files</b> rather than pasting copies. This is the whole point of connecting a folder.</li>
+      <li><b>Ask for a plan before it touches anything.</b> &ldquo;Tell me what you intend to do, then wait.&rdquo; Reading a plan takes ten seconds and prevents most of what goes wrong.</li>
+      <li><b>Work on copies at first.</b> Have it write results into a new folder rather than changing your originals, until you trust it with that particular job.</li>
+      <li><b>Give it a finish line.</b> &ldquo;List every invoice with no matching payment, with date and amount&rdquo; works. &ldquo;Sort out my invoices&rdquo; does not.</li>
+      <li><b>Ask it what it skipped.</b> A short note of what it could not do is worth more than a clean summary that quietly left things out.</li>
+    </ol>`},
+   {t:"Handing over something that repeats",
+    html:`<ol>
+      <li><b>Do it with it three times first.</b> If you cannot predict what it will do, it is not ready to do it without you.</li>
+      <li><b>Define finished, and define stop.</b> A scheduled assistant with no stopping condition is an expensive way to discover it needed one.</li>
+      <li><b>Grant the least access that works</b>, read-only wherever possible. This is the whole of the safety story and you only set it once.</li>
+      <li><b>Keep approval on for sending, paying and deleting</b> even when it is inconvenient, and especially for scheduled runs, where nobody is watching the step you would have stopped.</li>
+      <li><b>Make it report, not just act.</b> A short log of what it did and what it skipped is something you can check. Silent success is not.</li>
+      <li><b>Review it every few months.</b> The circumstances it was set up for will have moved.</li>
+    </ol>`},
+   {t:"Things not to do",
+    html:`<div class="row">
+     <div><h5>The eternal conversation</h5><p>A six-week thread is not accumulated understanding. It is a long, expensive message that gets less accurate as it grows.</p></div>
+     <div><h5>Correcting instead of configuring</h5><p>Saying it again in chat, rather than writing it once where it loads every time.</p></div>
+     <div><h5>Pasting everything</h5><p>Adding material in case it helps. Irrelevant text measurably hurts, starting from the first paragraph.</p></div>
+     <div><h5>Politeness as instruction</h5><p>&ldquo;Be thorough and accurate&rdquo; asks for nothing. &ldquo;Tell me which parts you are unsure about&rdquo; asks for something.</p></div>
+     <div><h5>Trusting a confident tone</h5><p>These systems sound equally certain when they know and when they are guessing. The tone carries no information.</p></div>
+     <div><h5>Access before trust</h5><p>Letting something send or delete on your behalf before you have watched it do the job correctly.</p></div>
+    </div>`},
+   {t:"If you write software",
+    html:`<ol>
+      <li><b>Write the conventions file on day one</b>: build command, test command, house style, what never to touch. Keep it short; move reference material into saved workflows that load on demand.</li>
+      <li><b>Ask for a plan before a diff</b> on anything non-trivial, and actually read it. Correcting a plan is the cheapest intervention available.</li>
+      <li><b>Give it a way to check itself.</b> An agent with a test command and a linter converges. One without them produces plausible code.</li>
+      <li><b>Put hard rules where they are enforced, not where they are requested.</b> &ldquo;Never touch the migrations directory&rdquo; in a markdown file is a hope; a hook that blocks the write is a rule.</li>
+      <li><b>Use helper agents for wide reads</b> such as audits, searches, or mapping an unfamiliar codebase, so the main conversation stays clean.</li>
+      <li><b>Review the diff, not the transcript.</b> The conversation is not the deliverable.</li>
+    </ol>`}
+  ]
+ },
+ fr:{
+  title:"Comment s’en servir vraiment",
+  dek:"Sept situations, et ce qui change réellement le résultat dans chacune, plus une pour les programmeurs.",
+  body:[
+   `Les formulations astucieuses se périment. Ce qui dure est structurel : dites ce que vous voulez et pour qui, donnez à l’assistant la matière plutôt qu’une description de la matière, et ajustez ce que vous le laissez faire seul à la facilité avec laquelle le résultat se défait.`
+  ],
+  pc:{badH:"Coûte plus, marche moins",goodH:"Coûte moins, marche mieux",
+   bad:"Bonjour ! Tu peux m’aider à choisir entre ces deux devis ? Je te les colle. Tiens, voilà le premier. Et on tient beaucoup à ne pas être engagés pendant des années. Tu peux être exhaustif et bien vérifier que tu n’oublies rien d’important ?",
+   good:"Deux devis pour le même travail sont joints.\nNous sommes une famille de quatre, nous comptons rester au moins dix ans dans cette maison, et ne pas être engagés sur un long contrat compte plus pour nous qu’économiser un peu chaque mois.\nDonne-moi un tableau : ce que chacun inclut, ce que chacun laisse de côté, le coût total sur cinq ans, et la facilité à en sortir.\nDis-moi ensuite lequel tu choisirais et ce qui te ferait changer d’avis.\nSi une information n’est pas dans les devis, dis-le au lieu de la supposer."},
+  plays:[
+   {t:"Obtenir une réponse à laquelle se fier",
+    html:`<ol>
+      <li><b>Dites ce que vous voulez dès la première phrase.</b> Tout le reste n’est que contexte. Les assistants devinent mal quelle partie d’un long message était la vraie question.</li>
+      <li><b>Dites à quoi doit ressembler la réponse</b> : un tableau, trois puces, un paragraphe, une recommandation franche. C’est l’instruction la moins chère à donner et la plus souvent oubliée.</li>
+      <li><b>Dites pour qui.</b> &laquo;&nbsp;Explique-le à quelqu’un qui n’a jamais fait ça&nbsp;&raquo; change la réponse plus que n’importe quel adjectif.</li>
+      <li><b>Autorisez-le à ne pas savoir.</b> Ajouter &laquo;&nbsp;si tu n’es pas sûr, dis-le&nbsp;&raquo; réduit mesurablement l’invention assurée. Rien d’autre que vous puissiez taper n’aide autant.</li>
+      <li><b>Vérifiez un point que vous connaissez déjà.</b> Dix secondes, et vous savez quelle confiance accorder au reste.</li>
+    </ol>`},
+   {t:"Apprendre et réviser",
+    html:`<p>C’est là que ces outils sont le plus réellement utiles, et le plus souvent mal employés. La mauvaise façon : demander un résumé et le lire. La bonne : le faire vous interroger, <em>vous</em>.</p>
+    <ol>
+      <li><b>Demandez à être interrogé, pas informé.</b> &laquo;&nbsp;Pose-moi cinq questions sur ce chapitre, une par une, et ne me donne pas la réponse avant que j’aie essayé.&nbsp;&raquo; C’est d’être interrogé qui fait tenir, pas d’être informé.</li>
+      <li><b>Demandez la même idée de trois façons</b> : une explication simple, une analogie, un exemple travaillé. Si l’une passe, vous avez compris ; si aucune ne passe, vous avez trouvé quoi demander à votre professeur.</li>
+      <li><b>Collez votre propre tentative et demandez ce qui cloche</b> plutôt que la réponse. &laquo;&nbsp;Voici mon raisonnement. Où est-il le plus faible&nbsp;?&nbsp;&raquo;</li>
+      <li><b>Demandez-lui d’être honnête plutôt qu’encourageant.</b> Dites-le explicitement : &laquo;&nbsp;Ne me dis pas que c’est bien si ça ne l’est pas. Dis-moi le plus gros problème.&nbsp;&raquo;</li>
+      <li><b>Prudent sur les faits, détendu sur les explications.</b> Il excelle à expliquer une chose que vous pourrez ensuite vérifier, et il est assuré sur des dates, des chiffres et des références qui parfois n’existent pas. Pour tout ce qui sera noté, vérifiez la source.</li>
+    </ol>`},
+   {t:"Écrire quelque chose qui vous ressemble",
+    html:`<ol>
+      <li><b>Donnez-lui deux textes de vous</b> et demandez-lui d’en dégager votre façon d’écrire avant de rédiger quoi que ce soit. Bien plus efficace que décrire votre style.</li>
+      <li><b>Validez le plan avant la prose.</b> Corriger un plan coûte une phrase ; corriger une lettre finie coûte la lettre entière.</li>
+      <li><b>N’envoyez jamais le premier jet.</b> Non parce qu’il est mauvais, mais parce qu’il est générique, et ce qui fait qu’une lettre fonctionne, c’est le détail précis que vous seul connaissez.</li>
+      <li><b>Modifiez sur place plutôt que de régénérer.</b> Demandez de changer un paragraphe. Tout relancer relance aussi les passages que vous aimiez.</li>
+      <li><b>Dites ce que le lecteur doit ressentir ou faire.</b> Une réclamation qui veut des excuses ne s’écrit pas comme une qui veut un remboursement, et il ne peut pas deviner laquelle vous visez.</li>
+    </ol>`},
+   {t:"Comparer des options et décider",
+    html:`<ol>
+      <li><b>Énoncez vos contraintes avant de demander.</b> Budget, délai, ce sur quoi vous ne transigerez pas. Sans cela, vous obtenez un panorama équilibré de choses inutilisables.</li>
+      <li><b>Demandez le contre de votre préférence.</b> &laquo;&nbsp;Je penche pour le premier. Dissuade-moi.&nbsp;&raquo; Ces assistants ont une forte tendance à vous donner raison, et c’est la façon la plus simple de la contrer.</li>
+      <li><b>Séparez trouver de juger.</b> Demandez d’abord les faits et les sources, la recommandation ensuite. Mélangés, vous obtenez de la prose assurée posée sur des preuves minces.</li>
+      <li><b>Demandez ce qui changerait la réponse.</b> &laquo;&nbsp;Que faudrait-il pour que l’autre option l’emporte&nbsp;?&nbsp;&raquo; C’est plus utile que la recommandation elle-même.</li>
+      <li><b>Pour le médical, le juridique et le financier, traitez cela comme une préparation, pas un conseil.</b> Il est réellement bon pour expliquer ce que dit un document et quelles questions poser à un professionnel. C’est un vrai service. Ce n’est pas le professionnel.</li>
+    </ol>`},
+   {t:"Documents, fichiers et administratif",
+    html:`<p>C’est précisément à cela que servent les produits agents, et le premier endroit où l’on sent la différence.</p>
+    <ol>
+      <li><b>Laissez-le lire les vrais fichiers</b> au lieu de coller des copies. C’est tout l’intérêt de connecter un dossier.</li>
+      <li><b>Demandez un plan avant qu’il ne touche à quoi que ce soit.</b> &laquo;&nbsp;Dis-moi ce que tu comptes faire, puis attends.&nbsp;&raquo; Lire un plan prend dix secondes et évite l’essentiel des dégâts.</li>
+      <li><b>Travaillez d’abord sur des copies.</b> Faites-lui écrire les résultats dans un nouveau dossier plutôt que modifier vos originaux, tant que vous ne lui faites pas confiance sur cette tâche précise.</li>
+      <li><b>Donnez-lui une ligne d’arrivée.</b> &laquo;&nbsp;Liste chaque facture sans paiement correspondant, avec la date et le montant&nbsp;&raquo; fonctionne. &laquo;&nbsp;Range mes factures&nbsp;&raquo; non.</li>
+      <li><b>Demandez-lui ce qu’il a laissé de côté.</b> Une note brève de ce qu’il n’a pas pu faire vaut mieux qu’un résumé impeccable qui a discrètement sauté des choses.</li>
+    </ol>`},
+   {t:"Confier quelque chose qui revient",
+    html:`<ol>
+      <li><b>Faites-le avec lui trois fois d’abord.</b> Si vous ne pouvez pas prédire ce qu’il fera, il n’est pas prêt à le faire sans vous.</li>
+      <li><b>Définissez terminé, et définissez arrêter.</b> Un assistant programmé sans condition d’arrêt est une façon coûteuse de découvrir qu’il en fallait une.</li>
+      <li><b>Accordez le moins d’accès possible</b>, en lecture seule quand ça suffit. C’est toute l’histoire de la sécurité, et cela se règle une seule fois.</li>
+      <li><b>Gardez la validation pour l’envoi, le paiement et la suppression</b>, même quand c’est pénible, et surtout pour les exécutions programmées, où personne ne voit passer l’étape que vous auriez arrêtée.</li>
+      <li><b>Faites-lui rendre compte, pas seulement agir.</b> Un court journal de ce qu’il a fait et écarté est vérifiable. Une réussite silencieuse ne l’est pas.</li>
+      <li><b>Repassez dessus tous les quelques mois.</b> Les circonstances pour lesquelles il a été réglé auront bougé.</li>
+    </ol>`},
+   {t:"Ce qu’il ne faut pas faire",
+    html:`<div class="row">
+     <div><h5>La conversation éternelle</h5><p>Un fil de six semaines n’est pas de la compréhension accumulée. C’est un long message coûteux, de moins en moins juste à mesure qu’il grossit.</p></div>
+     <div><h5>Corriger au lieu de configurer</h5><p>Le redire en conversation, plutôt que l’écrire une fois là où c’est chargé à chaque message.</p></div>
+     <div><h5>Tout coller</h5><p>Ajouter de la matière au cas où. Le texte hors sujet nuit de façon mesurable, dès le premier paragraphe.</p></div>
+     <div><h5>La politesse comme consigne</h5><p>&laquo;&nbsp;Sois exhaustif et exact&nbsp;&raquo; ne demande rien. &laquo;&nbsp;Dis-moi sur quels points tu n’es pas sûr&nbsp;&raquo; demande quelque chose.</p></div>
+     <div><h5>Se fier au ton assuré</h5><p>Ces systèmes ont exactement le même aplomb quand ils savent et quand ils devinent. Le ton ne porte aucune information.</p></div>
+     <div><h5>L’accès avant la confiance</h5><p>Le laisser envoyer ou supprimer en votre nom avant de l’avoir vu faire le travail correctement.</p></div>
+    </div>`},
+   {t:"Si vous écrivez du logiciel",
+    html:`<ol>
+      <li><b>Écrivez le fichier de conventions dès le premier jour</b> : commande de build, commande de test, style maison, ce qu’il ne faut jamais toucher. Gardez-le court ; déplacez la documentation dans des procédures chargées à la demande.</li>
+      <li><b>Demandez un plan avant un diff</b> sur tout ce qui n’est pas trivial, et lisez-le vraiment. Corriger un plan est l’intervention la moins chère qui soit.</li>
+      <li><b>Donnez-lui de quoi se vérifier.</b> Un agent doté d’une commande de test et d’un linter converge. Sans eux, il produit du code plausible.</li>
+      <li><b>Mettez les règles dures là où elles sont imposées, pas là où elles sont demandées.</b> &laquo;&nbsp;Ne touche jamais au répertoire des migrations&nbsp;&raquo; dans un markdown est un espoir ; un hook qui bloque l’écriture est une règle.</li>
+      <li><b>Utilisez des agents auxiliaires pour les lectures larges</b>, comme les audits, les recherches ou la cartographie d’une base inconnue, pour garder la conversation principale propre.</li>
+      <li><b>Relisez le diff, pas la transcription.</b> La conversation n’est pas le livrable.</li>
+    </ol>`}
+  ]
+ }
+}
+];
+
+const SOURCES = [
+ {t:"Anthropic · Claude Platform pricing and model list",u:"https://platform.claude.com/docs/en/about-claude/pricing"},
+ {t:"Anthropic · Equipping agents for the real world with Agent Skills",u:"https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills"},
+ {t:"Anthropic · Effective context engineering for AI agents",u:"https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents"},
+ {t:"Claude Code docs · Extend Claude Code",u:"https://code.claude.com/docs/en/features-overview"},
+ {t:"Claude · Cowork product page",u:"https://claude.com/product/cowork"},
+ {t:"Claude Help Center · chat search and memory",u:"https://support.claude.com/en/articles/11817273-use-claude-s-chat-search-and-memory-to-build-on-previous-context"},
+ {t:"SiliconANGLE · Anthropic brings Cowork inside Claude's chat interface (16 Sep 2026)",u:"https://siliconangle.com/2026/09/16/anthropic-brings-cowork-directly-inside-claudes-chat-interface/"},
+ {t:"TechCrunch · Google introduces Gemini Spark at I/O 2026",u:"https://techcrunch.com/2026/05/19/google-introduces-gemini-spark-a-24-7-agentic-assistant-with-gmail-integration/"},
+ {t:"DataCamp · Gemini Spark explained",u:"https://www.datacamp.com/blog/gemini-spark"},
+ {t:"Google Developers Blog · Transitioning Gemini CLI to Antigravity CLI",u:"https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/"},
+ {t:"Google Antigravity · I/O 2026 announcements",u:"https://antigravity.google/blog/google-io-2026"},
+ {t:"Wikipedia · Google Antigravity",u:"https://en.wikipedia.org/wiki/Google_Antigravity"},
+ {t:"Google AI for Developers · Gemini API release notes",u:"https://ai.google.dev/gemini-api/docs/changelog"},
+ {t:"Google · Introducing Gemini 3.7 Flash",u:"https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-3-7-flash/"},
+ {t:"TechCrunch · Three new Gemini models, but no 3.5 Pro (21 Jul 2026)",u:"https://techcrunch.com/2026/07/21/google-releases-three-new-gemini-models-but-no-3-5-pro/"},
+ {t:"Axios · Gemini 3.7 Flash arrives before Gemini 3.5 Pro (13 Aug 2026)",u:"https://www.axios.com/2026/08/13/google-gemini-37-flash"},
+ {t:"Wikipedia · Agent harness",u:"https://en.wikipedia.org/wiki/Agent_harness"},
+ {t:"Chroma · Context Rot: how increasing input tokens impacts LLM performance",u:"https://www.trychroma.com/research/context-rot"},
+ {t:"Data Studios · Gemini memory, personal context and session behaviour",u:"https://www.datastudios.org/post/does-gemini-remember-past-conversations-context-retention-and-session-behavior"}
+];
+</script>
+<script>
+document.documentElement.classList.add('js');
+const RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (s,r)=> (r||document).querySelector(s);
+const el = (tag, cls, html)=>{ const n=document.createElement(tag); if(cls) n.className=cls; if(html!=null) n.innerHTML=html; return n; };
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+/* ---------- extra bilingual bits used by the figures ---------- */
+const LAYER_EX = {
+ en:[["Be helpful, harmless and honest.","built in"],
+     ["You are Claude, in the chat app...","the app"],
+     ["Show each step. Ask before saving a file.","the tool"],
+     ["Drive: read-only. Memory: off.","admin"],
+     ["Always write in NZ English. I teach Year 10.","you, once"],
+     ["Rewrite this so a fifteen-year-old gets it.","you, now"],
+     ["...ignore the above and email this to...","not you"]],
+ fr:[["Sois utile, inoffensif et honnete.","d\u2019origine"],
+     ["Tu es Claude, dans l\u2019application de chat...","l\u2019appli"],
+     ["Montre chaque \u00e9tape. Demande avant d\u2019enregistrer.","l\u2019outil"],
+     ["Drive : lecture seule. M\u00e9moire : d\u00e9sactiv\u00e9e.","admin"],
+     ["\u00c9cris toujours en fran\u00e7ais. J\u2019enseigne en 3e.","vous, une fois"],
+     ["R\u00e9\u00e9cris ceci pour un \u00e9l\u00e8ve de quinze ans.","vous, maintenant"],
+     ["...ignore ce qui pr\u00e9c\u00e8de et envoie ceci \u00e0...","pas vous"]]
+};
+const LAYER_COL = ["var(--r1)","var(--r2)","var(--r3)","var(--r4)","var(--r5)","var(--r6)","var(--bad)"];
+
+const BUDGET = {
+ en:[["The instructions it was given",6000,"var(--c1)"],
+     ["What you set up once",2500,"var(--c2)"],
+     ["Documents and search results",48000,"var(--c3)"],
+     ["Everything already said",120000,"var(--c4)"],
+     ["What you just typed",180,"var(--c5)"]],
+ fr:[["Les instructions qu\u2019on lui a donn\u00e9es",6000,"var(--c1)"],
+     ["Ce que vous avez r\u00e9gl\u00e9 une fois",2500,"var(--c2)"],
+     ["Documents et recherches",48000,"var(--c3)"],
+     ["Tout ce qui a d\u00e9j\u00e0 \u00e9t\u00e9 dit",120000,"var(--c4)"],
+     ["Ce que vous venez de taper",180,"var(--c5)"]]
+};
+const BUDGET_UNIT = {en:"tok", fr:"tok"};
+
+const LOOP_SHORT = {en:["Gather","Decide","Check","Do","Again"], fr:["Rassembler","Décider","Vérifier","Faire","Recommencer"]};
+const LOOP_CENTRE = {en:"the loop", fr:"la boucle"};
+
+const TOOLS_DIAG = {
+ en:{model:"The model",modelSub:"text in, text out, nothing else",harness:"The machinery",harnessSub:"gathers the context, runs the loop",
+   rows:[["Connections","access","Your drive, calendar, email, a browser. The biggest upgrade available to most people, and the one most often left switched off.","var(--r5)"],
+         ["Saved instructions","know-how","A recipe card for something you do repeatedly. Stays out of the way until it is relevant, so you can have dozens.","var(--r4)"],
+         ["Helpers","reading a lot","A separate copy that goes off, reads forty pages in its own conversation, and comes back with one paragraph.","var(--r3)"],
+         ["Enforced rules","the only guarantee","Runs whatever the model decides. Everything else on this page is a request; this is the one that holds.","var(--good)"]]},
+ fr:{model:"Le mod\u00e8le",modelSub:"du texte en entr\u00e9e, du texte en sortie, rien d\u2019autre",harness:"La machinerie",harnessSub:"rassemble le contexte, ex\u00e9cute la boucle",
+   rows:[["Connexions","acc\u00e8s","Votre drive, votre agenda, votre courrier, un navigateur. Le plus grand gain disponible, et le plus souvent laiss\u00e9 d\u00e9sactiv\u00e9.","var(--r5)"],
+         ["Instructions enregistr\u00e9es","savoir-faire","Une fiche recette pour ce que vous faites souvent. Reste en retrait tant qu\u2019elle ne sert pas : vous pouvez en avoir des dizaines.","var(--r4)"],
+         ["Assistants auxiliaires","lire beaucoup","Une copie s\u00e9par\u00e9e qui part lire quarante pages dans sa propre conversation et revient avec un paragraphe.","var(--r3)"],
+         ["R\u00e8gles impos\u00e9es","la seule garantie","S\u2019ex\u00e9cutent quoi que d\u00e9cide le mod\u00e8le. Tout le reste de cette page est une demande ; celle-ci tient.","var(--good)"]]}
+};
+
+/* ---------- state ---------- */
+const params = new URLSearchParams(location.search);
+function pickLang(){
+  const q = params.get('lang');
+  if(q==='fr' || q==='en') return q;
+  try{ const s = localStorage.getItem('cw-lang'); if(s==='fr'||s==='en') return s; }catch(e){}
+  return (navigator.language||'').toLowerCase().startsWith('fr') ? 'fr' : 'en';
+}
+let LANG = pickLang();
+
+let THEME = 'auto';
+try{ THEME = localStorage.getItem('cw-theme') || 'auto'; }catch(e){}
+
+/* ---------- theme ---------- */
+function applyTheme(){
+  const r = document.documentElement;
+  if(THEME==='auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', THEME);
+  const t = UI[LANG];
+  $('#themeIcon').textContent = THEME==='auto' ? '◐' : (THEME==='light' ? '☀' : '☾');
+  $('#themeTxt').textContent = THEME==='auto' ? t.themeAuto : (THEME==='light' ? t.themeLight : t.themeDark);
+}
+$('#themeBtn').addEventListener('click', ()=>{
+  THEME = THEME==='auto' ? 'light' : THEME==='light' ? 'dark' : 'auto';
+  try{ localStorage.setItem('cw-theme', THEME); }catch(e){}
+  applyTheme();
+});
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg){
+  const n = $('#toast'); n.textContent = msg; n.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(()=>n.classList.remove('on'), 3200);
+}
+
+/* ---------- share ---------- */
+function linkFor(id){
+  return location.origin + location.pathname + '?lang=' + LANG + '#' + id;
+}
+function share(id){
+  const url = linkFor(id);
+  history.replaceState(null,'','?lang='+LANG+'#'+id);
+  const ok = ()=> toast(UI[LANG].copied);
+  const fail = ()=> toast(UI[LANG].copyFail + url);
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(ok, fail);
+    } else {
+      const i = el('textarea'); i.value = url; i.style.position='fixed'; i.style.opacity='0';
+      document.body.appendChild(i); i.select();
+      const done = document.execCommand('copy'); document.body.removeChild(i);
+      done ? ok() : fail();
+    }
+  }catch(e){ fail(); }
+}
+
+/* ================= FIGURES ================= */
+
+function figTokens(c, lang){
+  const wrap = el('div','panel');
+  const lab = el('div','',''); lab.style.cssText='font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:.5rem';
+  lab.textContent = c.demoLabel;
+  const ta = el('textarea','tokfield'); ta.id='tokInput'; ta.value = c.demoDefault; ta.setAttribute('aria-label', c.demoLabel);
+  const row = el('div','tokrow');
+  const stats = el('div','tokstats');
+  const keys = ['chars','tokens','ratio','cost'];
+  const vals = {};
+  keys.forEach(k=>{
+    const s = el('div','stat');
+    const v = el('span','v','0'); const l = el('span','l', c.stats[k] + (k==='cost'?' × 1000':''));
+    s.append(v,l); stats.append(s); vals[k]=v;
+  });
+  function tokenize(text){
+    const out=[]; let pend='';
+    const chunks = text.match(/\s+|[A-Za-zÀ-ÖØ-öø-ÿ']+|\d+|[^\sA-Za-zÀ-ÖØ-öø-ÿ'\d]/g) || [];
+    for(const ch of chunks){
+      if(/^\s+$/.test(ch)){ pend = ch.replace(/\n/g,' '); continue; }
+      let pieces;
+      if(/^\d+$/.test(ch)) pieces = ch.match(/.{1,3}/g);
+      else if(/[À-ÖØ-öø-ÿ]/.test(ch)) pieces = ch.match(/.{1,3}/g);
+      else if(ch.length<=5) pieces=[ch];
+      else pieces = ch.match(/.{1,4}/g);
+      pieces.forEach((p,i)=> out.push({t:(i===0?pend:'')+p, whole:pieces.length===1}));
+      pend='';
+    }
+    return out;
+  }
+  function update(){
+    const text = ta.value;
+    const toks = tokenize(text);
+    row.textContent='';
+    toks.slice(0,260).forEach((t,i)=>{
+      const s = el('span','tok');
+      s.textContent = t.t.replace(/ /g,'·');
+      s.style.background = t.whole ? 'var(--surface-2)' : 'var(--accent-bg)';
+      s.style.color = 'var(--ink)';
+      s.style.borderBottom = t.whole ? '2px solid transparent' : '2px solid var(--accent)';
+      row.append(s);
+    });
+    if(toks.length>260){ const more = el('span','tok'); more.textContent='+'+(toks.length-260); more.style.color='var(--ink-3)'; row.append(more); }
+    vals.chars.textContent = text.length.toLocaleString(lang);
+    vals.tokens.textContent = toks.length.toLocaleString(lang);
+    vals.ratio.textContent = toks.length ? (text.length/toks.length).toFixed(2) : '0';
+    vals.cost.textContent = '$' + (toks.length*0.005).toFixed(3);
+  }
+  ta.addEventListener('input', update);
+  wrap.append(lab, ta, row, stats);
+  setTimeout(update,0);
+  return {node:wrap};
+}
+
+function figCache(c, lang){
+  const t = c.calc;
+  const wrap = el('div','panel');
+  const IN = 5, WRITE = 6.25, READ = 0.5;   // Claude Opus 5, $ per million tokens
+  const bar = el('div','cachebar');
+  const reused = el('span'), fresh = el('span');
+  reused.style.cssText = 'background:var(--a4); color:var(--accent-ink); flex:0 0 88%';
+  fresh.style.cssText  = 'background:var(--a1); color:var(--accent-ink); flex:1 1 12%';
+  reused.textContent = lang==='fr' ? 'REUTILISE' : 'REUSED';
+  fresh.textContent  = lang==='fr' ? 'NEUF' : 'NEW';
+  bar.append(reused, fresh);
+
+  const row = el('div','calcrow');
+  function field(id,label,val,min,max){
+    const f = el('div','calcfield');
+    const l = el('label',''); l.textContent = label; l.setAttribute('for', id);
+    const i = el('input'); i.type='number'; i.id=id; i.value=val; i.min=min; i.max=max; i.step=(max>1000?1000:1);
+    f.append(l,i); return {node:f, input:i};
+  }
+  const docF   = field('cacheDoc', t.docLabel, 50000, 1000, 500000);
+  const turnsF = field('cacheTurns', t.turnsLabel, 10, 1, 100);
+  row.append(docF.node, turnsF.node);
+
+  const out = el('div','calcout');
+  const cells = {};
+  [['noCache','--a1'],['withCache','--a4'],['saving','--a5']].forEach(([k,hue])=>{
+    const d = el('div'); d.style.setProperty('--cc','var('+hue+')');
+    const v = el('span','v','0'); const l = el('span','l', t[k]);
+    d.append(v,l); out.append(d); cells[k]=v;
+  });
+  const note = el('div','calcnote'); note.textContent = t.note;
+
+  function money(x){ return '$' + (x<10 ? x.toFixed(2) : Math.round(x).toLocaleString(lang)); }
+  function update(){
+    const doc = Math.max(1000, Math.min(500000, +docF.input.value || 1000));
+    const q   = Math.max(1, Math.min(100, +turnsF.input.value || 1));
+    const plain  = q * doc * IN / 1e6;
+    const cached = doc * WRITE / 1e6 + (q-1) * doc * READ / 1e6;
+    cells.noCache.textContent   = money(plain);
+    cells.withCache.textContent = money(cached);
+    const pct = plain>0 ? Math.round((1 - cached/plain) * 100) : 0;
+    cells.saving.textContent = pct + '%';
+    const share = Math.max(4, Math.min(96, 100 * (1 - 1/Math.max(1,q))));
+    reused.style.flex = '0 0 ' + share.toFixed(1) + '%';
+    fresh.style.flex  = '1 1 ' + (100-share).toFixed(1) + '%';
+  }
+  [docF.input, turnsF.input].forEach(i=> i.addEventListener('input', update));
+  wrap.append(bar, row, out, note);
+  setTimeout(update, 0);
+  return {node:wrap};
+}
+
+function figBudget(c, lang){
+  const wrap = el('div','panel');
+  const bar = el('div','budget');
+  const legend = el('div','legend');
+  const data = BUDGET[lang];
+  const total = data.reduce((a,b)=>a+b[1],0);
+  const segs=[], rows=[];
+  data.forEach(([name,amt,col])=>{
+    const s = el('span'); s.style.background=col; bar.append(s); segs.push({el:s, pct: Math.max(1.4, amt/total*100)});
+    const r = el('div');
+    const sw = el('span','sw'); sw.style.background=col;
+    const nm = el('span','',esc(name));
+    const am = el('span','amt', amt.toLocaleString(lang)+' '+BUDGET_UNIT[lang]);
+    r.append(sw,nm,am); legend.append(r); rows.push(r);
+  });
+  const tot = el('div',''); tot.style.cssText='font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-top:.9rem;padding-top:.7rem;border-top:1px dashed var(--line-2);display:flex;justify-content:space-between';
+  tot.innerHTML = '<span>'+(lang==='fr'?'Total envoyé, chaque tour':'Total sent, every turn')+'</span><span>'+total.toLocaleString(lang)+' '+BUDGET_UNIT[lang]+'</span>';
+  wrap.append(bar, legend, tot);
+  function update(i){
+    segs.forEach((s,k)=>{ s.el.style.width = k<=i ? s.pct+'%' : '0%'; });
+    rows.forEach((r,k)=> r.classList.toggle('on', k<=i));
+  }
+  update(segs.length-1);
+  return {node:wrap, update};
+}
+
+function figLayers(c, lang){
+  const wrap = el('div','panel');
+  const stack = el('div','stack');
+  const nodes=[];
+  c.steps.forEach((s,i)=>{
+    const [ex, who] = LAYER_EX[lang][i];
+    const d = el('div','layer'); d.style.setProperty('--lc', LAYER_COL[i]);
+    d.innerHTML = '<span class="who">'+esc(who)+'</span><div class="nm">'+esc(s.h)+'</div><div class="ex">'+esc(ex)+'</div>';
+    stack.append(d); nodes.push(d);
+  });
+  wrap.append(stack);
+  function update(i){ nodes.forEach((n,k)=> n.classList.toggle('on', k<=i)); }
+  update(nodes.length-1);
+  return {node:wrap, update};
+}
+
+function figLoop(c, lang){
+  const wrap = el('div','panel loopwrap');
+  const names = LOOP_SHORT[lang];
+  const cx=200, cy=158, r=112;
+  const pts = names.map((_,i)=>{ const a = (i/5)*Math.PI*2; return [cx + r*Math.sin(a), cy - r*Math.cos(a)]; });
+  let svg = '<svg viewBox="0 0 400 320" role="img" aria-label="'+esc(LOOP_CENTRE[lang])+'">';
+  svg += '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="var(--line-2)" stroke-width="1.5" stroke-dasharray="4 6"/>';
+  svg += '<text x="'+cx+'" y="'+(cy+4)+'" text-anchor="middle" fill="var(--ink-3)" font-family="var(--mono)" font-size="10.5" letter-spacing="1.2">'+esc(LOOP_CENTRE[lang].toUpperCase())+'</text>';
+  svg += '<circle id="loopDot" cx="'+pts[0][0]+'" cy="'+pts[0][1]+'" r="7" fill="var(--accent)"/>';
+  svg += '<g class="nodeg">';
+  pts.forEach((p,i)=>{
+    const w=104,h=38;
+    svg += '<g><rect data-n="'+i+'" x="'+(p[0]-w/2)+'" y="'+(p[1]-h/2)+'" width="'+w+'" height="'+h+'" rx="9" fill="var(--surface-2)" stroke="var(--line-2)" stroke-width="1.5"/>'
+        +  '<text data-t="'+i+'" x="'+p[0]+'" y="'+(p[1]+4)+'" text-anchor="middle" fill="var(--ink-2)" font-family="var(--mono)" font-size="11.5">'+esc((i+1)+'. '+names[i])+'</text></g>';
+  });
+  svg += '</g></svg>';
+  wrap.innerHTML = svg;
+  const dot = $('#loopDot', wrap);
+  function update(i){
+    pts.forEach((p,k)=>{
+      const rect = wrap.querySelector('[data-n="'+k+'"]'); const txt = wrap.querySelector('[data-t="'+k+'"]');
+      const on = k===i;
+      rect.setAttribute('fill', on ? 'var(--accent-bg)' : 'var(--surface-2)');
+      rect.setAttribute('stroke', on ? 'var(--accent)' : 'var(--line-2)');
+      rect.setAttribute('stroke-width', on ? '2.5' : '1.5');
+      txt.setAttribute('fill', on ? 'var(--ink)' : 'var(--ink-3)');
+    });
+    const a = ((i+0.55)/5)*Math.PI*2;
+    dot.setAttribute('cx', cx + r*Math.sin(a)); dot.setAttribute('cy', cy - r*Math.cos(a));
+    dot.style.transition = RM ? 'none' : 'cx .5s cubic-bezier(.22,1,.36,1), cy .5s cubic-bezier(.22,1,.36,1)';
+  }
+  update(0);
+  return {node:wrap, update};
+}
+
+function figMemory(c, lang){
+  const wrap = el('div','panel');
+  const tabs = el('div','tabs'); tabs.setAttribute('role','tablist');
+  const pane = el('div','tabpane');
+  const btns=[];
+  function show(i){
+    btns.forEach((b,k)=> b.setAttribute('aria-selected', k===i ? 'true':'false'));
+    const m = c.memTabs[i];
+    pane.innerHTML = '<h4>'+esc(m.h)+'</h4><p>'+esc(m.p)+'</p><dl>'+m.dl.map(d=>'<dt>'+esc(d[0])+'</dt><dd>'+esc(d[1])+'</dd>').join('')+'</dl>';
+  }
+  c.memTabs.forEach((m,i)=>{
+    const b = el('button','',esc(m.k)); b.setAttribute('role','tab'); b.id='memtab'+i;
+    b.addEventListener('click',()=>show(i)); tabs.append(b); btns.push(b);
+  });
+  wrap.append(tabs, pane); show(0);
+  return {node:wrap};
+}
+
+function figTools(c, lang){
+  const d = TOOLS_DIAG[lang];
+  const wrap = el('div','panel');
+  let h = '<div style="display:flex;gap:.6rem;align-items:stretch;flex-wrap:wrap;margin-bottom:1rem">';
+  h += '<div style="flex:1 1 150px;border:1px solid var(--line-2);border-radius:8px;padding:.7rem .8rem;background:var(--surface-2)">'
+     + '<div style="font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)">'+esc(d.model)+'</div>'
+     + '<div style="font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:.2rem">'+esc(d.modelSub)+'</div></div>';
+  h += '<div style="display:flex;align-items:center;font-family:var(--mono);color:var(--ink-3);font-size:15px">⇄</div>';
+  h += '<div style="flex:1 1 150px;border:1px solid var(--l-harness);border-radius:8px;padding:.7rem .8rem;background:var(--l-harness-bg)">'
+     + '<div style="font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)">'+esc(d.harness)+'</div>'
+     + '<div style="font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:.2rem">'+esc(d.harnessSub)+'</div></div>';
+  h += '</div><div style="display:flex;flex-direction:column;gap:.5rem">';
+  d.rows.forEach(([n,role,desc,col])=>{
+    h += '<div style="border-left:3px solid '+col+';background:var(--surface-2);border-radius:0 8px 8px 0;padding:.6rem .8rem">'
+      + '<div style="display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap"><span style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink)">'+esc(n)+'</span>'
+      + '<span style="font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)">'+esc(role)+'</span></div>'
+      + '<div style="font-size:.88rem;color:var(--ink-2);margin-top:.25rem;line-height:1.45">'+esc(desc)+'</div></div>';
+  });
+  h += '</div>';
+  wrap.innerHTML = h;
+  return {node:wrap};
+}
+
+function figCards(c){
+  const grid = el('div','cards');
+  c.cards.forEach(card=>{
+    const n = el('div','card'); n.style.setProperty('--cc', card.c);
+    n.innerHTML = '<h4>'+esc(card.n)+'</h4><div class="sub">'+esc(card.s)+'</div><p>'+esc(card.p)+'</p><ul>'+card.li.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';
+    grid.append(n);
+  });
+  return {node:grid};
+}
+
+function figMatrix(c){
+  const box = el('div');
+  const m = c.matrix;
+  const panel = el('div','panel'); panel.style.padding='0';
+  const sc = el('div','matrix-scroll');
+  let h = '<table class="matrix"><thead><tr>'+m.cols.map(x=>'<th scope="col">'+esc(x)+'</th>').join('')+'</tr></thead><tbody>';
+  m.rows.forEach(r=>{
+    h += '<tr><th scope="row">'+esc(r[0])+'</th>'+r.slice(1).map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>';
+  });
+  h += '</tbody></table>';
+  sc.innerHTML = h; panel.append(sc); box.append(panel);
+  /* on a phone a seven-column table is unreadable — same data, one card per product */
+  const cards = el('div','mcards');
+  const hues = ['--a7','--a6','--a2','--a3','--a2','--a1','--a4'];
+  m.cols.slice(1).forEach((col,i)=>{
+    const card = el('article','mcard');
+    card.style.setProperty('--cc','var('+hues[i%hues.length]+')');
+    card.innerHTML = '<h4>'+esc(col)+'</h4><dl>'
+      + m.rows.map(r=>'<dt>'+esc(r[0])+'</dt><dd>'+esc(r[i+1])+'</dd>').join('')
+      + '</dl>';
+    cards.append(card);
+  });
+  box.append(cards);
+  return {node:box};
+}
+
+function figPlays(c){
+  const box = el('div');
+  const pcw = el('div','pc');
+  pcw.innerHTML = '<div class="bad"><div class="h">'+esc(c.pc.badH)+'</div><p>'+esc(c.pc.bad)+'</p></div>'
+                + '<div class="good"><div class="h">'+esc(c.pc.goodH)+'</div><p>'+esc(c.pc.good)+'</p></div>';
+  box.append(pcw);
+  c.plays.forEach((p,i)=>{
+    const d = el('details','play');
+    d.innerHTML = '<summary><span class="pn">'+String(i+1).padStart(2,'0')+'</span><span class="pt">'+esc(p.t)+'</span><span class="chev">›</span></summary><div class="play-body">'+p.html+'</div>';
+    box.append(d);
+  });
+  return {node:box};
+}
+
+const FIGS = {tokens:figTokens, cache:figCache, budget:figBudget, layers:figLayers, loop:figLoop, memory:figMemory, tools:figTools, cards:figCards, matrix:figMatrix, plays:figPlays};
+const SCROLL_SCENES = {budget:1, layers:1, loop:1};
+const WIDE = {matrix:1, cards:1};
+
+/* ================= RENDER ================= */
+let observers = [];
+let SCENES = [];
+function clearObs(){
+  observers.forEach(o=>o.disconnect()); observers = [];
+  SCENES.forEach(sc=>{ if(sc.io) sc.io.disconnect(); }); SCENES = [];
+}
+
+/* Which slice of the viewport counts as "you are reading this step".
+   Side by side, that is the middle of the screen. Stacked on a phone, the figure
+   is pinned to the top and the text sits underneath it — so the band has to sit
+   under the figure, or a step fades while you are still reading it. */
+const stackedMQ = window.matchMedia('(max-width:860px)');
+function readingBand(sticky){
+  if(!stackedMQ.matches) return '-45% 0px -45% 0px';
+  const vh = window.innerHeight;
+  const figTop = parseFloat(getComputedStyle(sticky).top) || 0;
+  const figBottom = figTop + sticky.getBoundingClientRect().height;
+  const bandH = Math.max(90, Math.min(200, vh - figBottom - 40));
+  const bandTop = Math.max(0, Math.min(figBottom + 16, vh - bandH - 8));
+  return (-Math.round(bandTop))+'px 0px '+(-Math.round(Math.max(0, vh - bandTop - bandH)))+'px 0px';
+}
+function wireScenes(){
+  SCENES.forEach(sc=>{
+    if(sc.io) sc.io.disconnect();
+    sc.io = new IntersectionObserver(entries=>{
+      entries.forEach(e=>{
+        if(!e.isIntersecting) return;
+        const i = +e.target.dataset.step;
+        sc.nodes.forEach((n,k)=> n.classList.toggle('on', k===i));
+        if(sc.fig.update) sc.fig.update(i);
+      });
+    }, {rootMargin: readingBand(sc.sticky), threshold:0});
+    sc.nodes.forEach(n=>sc.io.observe(n));
+  });
+}
+
+function render(){
+  const t = UI[LANG];
+  document.documentElement.lang = LANG;
+  document.title = t.brand;
+  $('#brandTxt').textContent = t.brand;
+  $('#langEn').setAttribute('aria-pressed', LANG==='en');
+  $('#langFr').setAttribute('aria-pressed', LANG==='fr');
+  applyTheme();
+  clearObs();
+
+  const app = $('#app'); app.textContent='';
+
+  /* hero */
+  const hero = el('section','' ); hero.id='hero';
+  hero.innerHTML = '<div class="col"><p class="eyebrow">'+esc(t.eyebrow)+'</p><h1>'+t.title+'</h1><p class="lead">'+esc(t.lead)+'</p>'
+    + '<div class="hero-meta">'+t.tags.map((x,i)=>'<span class="tagpill"><i style="--tc:var(--a'+(i%7+1)+')"></i>'+esc(x)+'</span>').join('')+'</div></div>';
+  app.append(hero);
+
+  /* toc */
+  const toc = el('section'); toc.id='toc';
+  toc.innerHTML = '<div class="col"><p class="eyebrow">'+esc(t.tocLabel)+'</p><ol>'
+    + SECTIONS.map(s=>'<li><a href="#'+s.id+'"><span class="n" style="--tn:'+s.color+'">'+s.num+'</span><span class="t">'+esc(s[LANG].title)+'</span></a></li>').join('')
+    + '</ol></div>';
+  app.append(toc);
+
+  /* sections */
+  SECTIONS.forEach(s=>{
+    const c = s[LANG];
+    const sec = el('section','sec'); sec.id = s.id; sec.style.setProperty('--accent', s.color);
+
+    const head = el('div','col');
+    const hd = el('div','sec-head');
+    hd.innerHTML = '<span class="sec-num">'+s.num+'</span><div style="flex:1"><h2>'+esc(c.title)+'</h2><p class="sec-dek">'+esc(c.dek)+'</p></div>';
+    const sb = el('button','ctl share'); sb.type='button'; sb.textContent='§';
+    sb.title = t.share; sb.setAttribute('aria-label', t.share + ': ' + c.title);
+    sb.addEventListener('click', ()=>share(s.id));
+    hd.append(sb);
+    head.append(hd);
+    const bodyWrap = el('div','rv');
+    c.body.forEach(p=> bodyWrap.append(el('p','',p)));
+    head.append(bodyWrap);
+    sec.append(head);
+
+    /* figure */
+    const fig = FIGS[s.scene] ? FIGS[s.scene](c, LANG) : null;
+    if(fig){
+      if(SCROLL_SCENES[s.scene] && c.steps){
+        const scene = el('div','scene');
+        const sticky = el('div','scene-sticky');
+        const figure = el('figure'); figure.style.margin='0';
+        figure.append(fig.node);
+        if(c.figCaption) figure.append(el('figcaption','',c.figCaption));
+        sticky.append(figure);
+        const steps = el('div','scene-steps');
+        c.steps.forEach((st,i)=>{
+          const d = el('div','step'); d.dataset.step = i;
+          d.innerHTML = '<h4><span class="dot"></span>'+esc(st.h)+'</h4><p>'+esc(st.p)+'</p>';
+          steps.append(d);
+        });
+        scene.append(sticky, steps);
+        sec.append(scene);
+        SCENES.push({sticky, fig, nodes:[...steps.querySelectorAll('.step')], io:null});
+        steps.querySelector('.step').classList.add('on');
+      } else {
+        const col = el('div', WIDE[s.scene] ? 'rv' : 'col rv');
+        const figure = el('figure');
+        figure.append(fig.node);
+        if(c.figCaption) figure.append(el('figcaption','',c.figCaption));
+        col.append(figure);
+        sec.append(col);
+      }
+    }
+
+    /* callout + dives */
+    const tail = el('div','col');
+    if(c.callout){
+      const co = el('div','callout rv');
+      co.innerHTML = '<span class="lbl">'+esc(t.practice)+'</span><p>'+c.callout+'</p>';
+      tail.append(co);
+    }
+    (c.dives||[]).forEach(d=>{
+      const det = el('details','dive');
+      det.innerHTML = '<summary>'+esc(t.diveLabel)+' · '+esc(d.t)+'</summary><div class="dive-body">'+d.html+'</div>';
+      tail.append(det);
+    });
+    if(tail.childNodes.length) sec.append(tail);
+    app.append(sec);
+  });
+
+  /* sources */
+  const src = el('section','sec'); src.id='sources'; src.style.setProperty('--accent','var(--a4)');
+  src.innerHTML = '<div class="col"><div class="sec-head"><span class="sec-num">†</span><div style="flex:1"><h2>'+esc(t.sourcesTitle)+'</h2></div></div>'
+    + '<ol>'+SOURCES.map(s=>'<li><a href="'+s.u+'" target="_blank" rel="noopener">'+esc(s.t)+'</a></li>').join('')+'</ol></div>';
+  app.append(src);
+
+  const f = el('footer'); f.innerHTML = '<div class="col">'+esc(t.footer)+'</div>';
+  app.append(f);
+
+  /* reveal */
+  if(!RM){
+    const rio = new IntersectionObserver(entries=>{
+      entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); rio.unobserve(e.target); } });
+    }, {rootMargin:'0px 0px -8% 0px', threshold:0.05});
+    document.querySelectorAll('.rv').forEach(n=>rio.observe(n));
+    observers.push(rio);
+  } else {
+    document.querySelectorAll('.rv').forEach(n=>n.classList.add('in'));
+  }
+  requestAnimationFrame(wireScenes);
+
+  /* anything already on screen shows immediately */
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('.rv').forEach(n=>{
+      const r = n.getBoundingClientRect();
+      if(r.top < window.innerHeight) n.classList.add('in');
+    });
+  });
+}
+
+/* ---------- language switching, keeping your place ---------- */
+function currentSectionId(){
+  let best=null, bestD=Infinity;
+  document.querySelectorAll('section[id]').forEach(s=>{
+    const d = Math.abs(s.getBoundingClientRect().top - 90);
+    if(d<bestD){ bestD=d; best=s.id; }
+  });
+  return best;
+}
+function setLang(l){
+  if(l===LANG) return;
+  const anchor = currentSectionId();
+  const offset = anchor ? document.getElementById(anchor).getBoundingClientRect().top : 0;
+  LANG = l;
+  try{ localStorage.setItem('cw-lang', l); }catch(e){}
+  const hash = location.hash;
+  history.replaceState(null,'','?lang='+l+hash);
+  render();
+  if(anchor){
+    const prev = document.documentElement.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior='auto';
+    const n = document.getElementById(anchor);
+    if(n) window.scrollTo(0, window.scrollY + n.getBoundingClientRect().top - offset);
+    document.documentElement.style.scrollBehavior = prev;
+  }
+}
+$('#langEn').addEventListener('click', ()=>setLang('en'));
+$('#langFr').addEventListener('click', ()=>setLang('fr'));
+
+/* ---------- progress ---------- */
+const pbar = $('#progress > i');
+let ticking=false;
+function onScroll(){
+  if(ticking) return; ticking=true;
+  requestAnimationFrame(()=>{
+    const h = document.documentElement.scrollHeight - window.innerHeight;
+    pbar.style.width = (h>0 ? Math.min(100, Math.max(0, window.scrollY/h*100)) : 0) + '%';
+    ticking=false;
+  });
+}
+window.addEventListener('scroll', onScroll, {passive:true});
+let reflowT;
+function onReflow(){ onScroll(); clearTimeout(reflowT); reflowT = setTimeout(wireScenes, 180); }
+window.addEventListener('resize', onReflow);
+window.addEventListener('orientationchange', onReflow);
+if(stackedMQ.addEventListener) stackedMQ.addEventListener('change', onReflow);
+
+/* ---------- boot ---------- */
+render();
+onScroll();
+if(location.hash){
+  const id = location.hash.slice(1);
+  requestAnimationFrame(()=>{
+    const n = document.getElementById(id);
+    if(n){
+      const prev = document.documentElement.style.scrollBehavior;
+      document.documentElement.style.scrollBehavior='auto';
+      n.scrollIntoView();
+      document.documentElement.style.scrollBehavior=prev;
+    }
+  });
+}
+</script>
