@@ -1918,36 +1918,60 @@ let observers = [];
 let SCENES = [];
 function clearObs(){
   observers.forEach(o=>o.disconnect()); observers = [];
-  SCENES.forEach(sc=>{ if(sc.io) sc.io.disconnect(); }); SCENES = [];
+  SCENES = [];
 }
 
-/* Which slice of the viewport counts as "you are reading this step".
-   Side by side, that is the middle of the screen. Stacked on a phone, the figure
-   is pinned to the top and the text sits underneath it — so the band has to sit
-   under the figure, or a step fades while you are still reading it. */
+/* Which step is the reader on?
+   Not "which box overlaps a band": the step boxes are several hundred pixels tall, so a
+   box touches any band long before its text is readable, and two adjacent boxes routinely
+   overlap it at once. Instead, measure where each step's heading sits and pick the last
+   one the reader has actually passed. Offsets are cached per layout, so the scroll
+   handler does no measuring and forces no reflow. */
 const stackedMQ = window.matchMedia('(max-width:860px)');
-function readingBand(sticky){
-  if(!stackedMQ.matches) return '-45% 0px -45% 0px';
-  const vh = window.innerHeight;
-  const figTop = parseFloat(getComputedStyle(sticky).top) || 0;
-  const figBottom = figTop + sticky.getBoundingClientRect().height;
-  const bandH = Math.max(90, Math.min(200, vh - figBottom - 40));
-  const bandTop = Math.max(0, Math.min(figBottom + 16, vh - bandH - 8));
-  return (-Math.round(bandTop))+'px 0px '+(-Math.round(Math.max(0, vh - bandTop - bandH)))+'px 0px';
-}
-function wireScenes(){
+
+function measureScenes(){
   SCENES.forEach(sc=>{
-    if(sc.io) sc.io.disconnect();
-    sc.io = new IntersectionObserver(entries=>{
-      entries.forEach(e=>{
-        if(!e.isIntersecting) return;
-        const i = +e.target.dataset.step;
-        sc.nodes.forEach((n,k)=> n.classList.toggle('on', k===i));
-        if(sc.fig.update) sc.fig.update(i);
-      });
-    }, {rootMargin: readingBand(sc.sticky), threshold:0});
-    sc.nodes.forEach(n=>sc.io.observe(n));
+    const pageY = window.scrollY;
+    sc.tops = sc.nodes.map(n=>{
+      const h = n.querySelector('h4') || n;
+      return h.getBoundingClientRect().top + pageY;
+    });
+    const st = getComputedStyle(sc.sticky);
+    sc.stickyTop = parseFloat(st.top) || 0;
+    sc.stickyH = sc.sticky.getBoundingClientRect().height;
   });
+}
+
+/* the line down the page that counts as "you are reading here" */
+function readingLine(sc){
+  const vh = window.innerHeight;
+  if (!stackedMQ.matches) return vh * 0.42;          // side by side: a little above centre
+  return Math.min(vh - 60, sc.stickyTop + sc.stickyH + 84);  // stacked: just under the figure
+}
+
+function syncScenes(){
+  for (const sc of SCENES){
+    if (!sc.tops || !sc.tops.length) continue;
+    const target = window.scrollY + readingLine(sc);
+    let i = 0;
+    for (let k = 0; k < sc.tops.length; k++) if (sc.tops[k] <= target) i = k;
+    if (i === sc.active) continue;
+    sc.active = i;
+    sc.nodes.forEach((n,k)=> n.classList.toggle('on', k === i));
+    if (sc.fig.update) sc.fig.update(i);
+  }
+}
+
+function wireScenes(){
+  measureScenes();
+  SCENES.forEach(sc=>{ sc.active = -1; });
+  syncScenes();
+  /* the cached offsets are only as good as the layout they were read from, and the
+     web fonts land after first paint, so take the measurement again once it settles */
+  setTimeout(()=>{ measureScenes(); syncScenes(); }, 350);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(()=>{ measureScenes(); syncScenes(); }).catch(()=>{});
+  }
 }
 
 function render(){
@@ -2011,7 +2035,7 @@ function render(){
         });
         scene.append(sticky, steps);
         sec.append(scene);
-        SCENES.push({sticky, fig, nodes:[...steps.querySelectorAll('.step')], io:null});
+        SCENES.push({sticky, fig, nodes:[...steps.querySelectorAll('.step')], tops:null, active:-1});
         steps.querySelector('.step').classList.add('on');
       } else {
         const col = el('div', WIDE[s.scene] ? 'rv' : 'col rv');
@@ -2116,12 +2140,16 @@ $('#langFr').addEventListener('click', ()=>setLang('fr'));
 
 /* ---------- progress ---------- */
 const pbar = $('#progress > i');
-let ticking=false;
+let ticking=false, lastDocH=0;
 function onScroll(){
   if(ticking) return; ticking=true;
   requestAnimationFrame(()=>{
-    const h = document.documentElement.scrollHeight - window.innerHeight;
+    const docH = document.documentElement.scrollHeight;
+    const h = docH - window.innerHeight;
     pbar.style.transform = 'scaleX(' + (h>0 ? Math.min(1, Math.max(0, window.scrollY/h)) : 0).toFixed(4) + ')';
+    /* anything that changed the page height also moved the steps */
+    if (docH !== lastDocH){ lastDocH = docH; measureScenes(); }
+    syncScenes();
     ticking=false;
   });
 }
