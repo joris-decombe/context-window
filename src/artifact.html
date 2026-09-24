@@ -847,11 +847,18 @@ const SECTIONS = [
     <p><b>Preferences</b>, such as how you like things written or what you are busy with this term, are what automatic memory is genuinely good at. Let it. Then glance at the list occasionally, because it accumulates.</p>
     <p><b>Facts about the world</b> belong in a lookup, never in memory. A saved note about a price, a date or a rule will outlive its accuracy without ever mentioning that it has.</p>
     <p><b>Anything private</b> belongs in neither by default. Both products give you a per-conversation off switch, incognito on Claude and Temporary Chat on Gemini, and keep sensitive categories behind a separate opt-in. For medical, financial or family matters, those switches are what they are for.</p>`},
-   {t:"A habit worth having",
-    html:`<p>Once a month, open the memory settings and read what has been saved about you. It takes five minutes and it is worth more than any prompting technique, for a simple reason: a wrong fact in memory is wrong in every future conversation, quietly, without ever announcing itself.</p>
-    <p>Typical things worth deleting: a job you no longer do, a preference you expressed once about one document and never again, a conclusion the assistant drew about you that you never actually said, and anything you would not want to see reappear in a conversation you were screen-sharing.</p>`}
+   {t:"Correcting what it thinks it knows",
+    html:`<p>The obvious advice is to audit the memory screen on a schedule. Nobody does that, and both companies recommend something better: just ask. Memory is the one part of this that manages itself conversationally.</p>
+    <p><b>The moment to ask is not the first of the month.</b> It is when an answer knows something you did not just tell it, or gets you wrong. That is the signal, and it arrives on its own.</p>
+    <ul class="bul">
+      <li><b>To see what it has:</b> ask it. Google documents the question for Gemini as &ldquo;Did you use any info from past chats?&rdquo;, and Gemini shows a previous-chats marker on answers it drew from. Claude will summarise what it holds about you if asked.</li>
+      <li><b>To fix something:</b> say so in the conversation. Anthropic&rsquo;s wording is that you tell Claude what to remember, change or forget, and the update applies from your next conversation. Google&rsquo;s is to correct Gemini directly in the chat.</li>
+      <li><b>To sweep properly:</b> ask it to sort its own memory. Something like &ldquo;go through what you remember about me and mark each one useful, out of date, unclear or unnecessary&rdquo; does in one turn what the monthly reading was meant to do, and it surfaces the entries you would have skimmed past.</li>
+    </ul>
+    <p><b>The caveat matters, though.</b> Asking is introspection, not inspection. You are asking the assistant to report on its own store, and &ldquo;forget that&rdquo; is a request applied going forward rather than proof that a row is gone. For anything you actually need removed, the settings screen is the store itself, and it is where deletion is a deletion. The distinction is the same one this article keeps returning to: an instruction is a request, a setting is a lock.</p>
+    <p>Worth removing whenever you look: a job you no longer do, a preference you expressed once about one document, a conclusion it drew about you that you never actually said, and anything you would rather not see reappear while you are sharing your screen.</p>`}
   ],
-  callout:`<b>Read your own memory once a month.</b> Both products let you see and delete individual entries. Five minutes of tidying beats any clever phrasing, because a wrong fact in there is wrong everywhere, forever.`
+  callout:`<b>Ask it what it knows about you, the moment something looks off.</b> Not on a schedule, because nobody keeps one. When an answer knows something you did not just tell it, or gets you wrong, ask where that came from and correct it in the conversation. Both products are built to take the correction that way.`
  },
  fr:{
   title:"La mémoire",
@@ -880,14 +887,21 @@ const SECTIONS = [
   dives:[
    {t:"Quoi mettre où",
     html:`<p><b>Les règles permanentes</b> vont dans ce que vous écrivez : un projet, un profil, un Gem. Écrit une fois, appliqué à chaque fois, corrigeable quand c’est faux.</p>
-    <p><b>Les préférences</b>, comme votre style ou ce qui vous occupe ce trimestre, sont exactement ce que la mémoire automatique fait bien. Laissez-la faire, puis jetez un œil à la liste de temps en temps, parce qu’elle s’accumule.</p>
+    <p><b>Les préférences</b>, comme votre style ou ce qui vous occupe ce trimestre, sont exactement ce que la mémoire automatique fait bien. Laissez-la faire. C’est aussi la couche qui dérive le plus, donc celle sur laquelle l’interroger quand une réponse sonne faux.</p>
     <p><b>Les faits sur le monde</b> relèvent de la recherche, jamais de la mémoire. Une note enregistrée sur un prix, une date ou une règle survivra à son exactitude sans jamais le signaler.</p>
     <p><b>Tout ce qui est privé</b> ne relève par défaut ni de l’une ni de l’autre. Les deux produits offrent un interrupteur par conversation, incognito chez Claude et mode Temporaire chez Gemini, et placent les catégories sensibles derrière une activation distincte. Pour le médical, le financier ou le familial, ces interrupteurs sont faits pour ça.</p>`},
-   {t:"Une habitude à prendre",
-    html:`<p>Une fois par mois, ouvrez les réglages de mémoire et lisez ce qui a été enregistré sur vous. Cinq minutes, et cela vaut mieux que n’importe quelle technique de formulation, pour une raison simple : un fait faux en mémoire est faux dans toutes les conversations à venir, discrètement, sans jamais s’annoncer.</p>
-    <p>Ce qu’on gagne typiquement à supprimer : un métier que vous ne faites plus, une préférence exprimée une fois pour un seul document, une conclusion que l’assistant a tirée sur vous sans que vous l’ayez dite, et tout ce que vous n’aimeriez pas voir resurgir pendant un partage d’écran.</p>`}
+   {t:"Corriger ce qu’il croit savoir",
+    html:`<p>Le conseil évident serait de relire l’écran de mémoire à date fixe. Personne ne le fait, et les deux éditeurs recommandent mieux : demandez-lui. La mémoire est justement la partie qui se gère en conversation.</p>
+    <p><b>Le bon moment n’est pas le premier du mois.</b> C’est quand une réponse sait quelque chose que vous ne venez pas de dire, ou se trompe sur vous. Le signal arrive tout seul.</p>
+    <ul class="bul">
+      <li><b>Pour voir ce qu’il a :</b> demandez-lui. Google formule la question pour Gemini ainsi : &laquo;&nbsp;As-tu utilisé des informations de conversations passées&nbsp;?&nbsp;&raquo;, et Gemini affiche un repère sur les réponses concernées. Claude résume ce qu’il retient de vous si on le lui demande.</li>
+      <li><b>Pour corriger :</b> dites-le dans la conversation. Anthropic l’écrit ainsi : vous dites à Claude ce qu’il doit retenir, modifier ou oublier, et la mise à jour s’applique dès la conversation suivante. Google : corrigez Gemini directement dans le chat.</li>
+      <li><b>Pour faire le ménage :</b> demandez-lui de trier sa propre mémoire. Quelque chose comme &laquo;&nbsp;passe en revue ce que tu retiens de moi et classe chaque élément en utile, périmé, flou ou inutile&nbsp;&raquo; fait en un tour ce que la relecture mensuelle visait, et fait remonter les entrées que vous auriez survolées.</li>
+    </ul>
+    <p><b>La réserve compte, tout de même.</b> Demander relève de l’introspection, pas de l’inspection. Vous demandez à l’assistant de rendre compte de son propre stock, et &laquo;&nbsp;oublie ça&nbsp;&raquo; est une demande appliquée à partir de maintenant, pas la preuve qu’une ligne a disparu. Pour ce que vous voulez réellement supprimer, l’écran de réglages est le stock lui-même, et c’est là qu’une suppression en est une. La distinction est celle sur laquelle cet article revient sans cesse : une instruction est une demande, un réglage est un verrou.</p>
+    <p>À supprimer dès que vous y passez : un métier que vous ne faites plus, une préférence exprimée une fois pour un seul document, une conclusion qu’il a tirée sur vous sans que vous l’ayez dite, et tout ce que vous préféreriez ne pas voir resurgir pendant un partage d’écran.</p>`}
   ],
-  callout:`<b>Relisez votre propre mémoire une fois par mois.</b> Les deux produits permettent de voir et de supprimer chaque entrée. Cinq minutes de ménage valent mieux que n’importe quelle astuce de formulation : un fait faux là-dedans est faux partout, indéfiniment.`
+  callout:`<b>Demandez-lui ce qu’il sait de vous, dès que quelque chose cloche.</b> Pas à date fixe, parce que personne ne s’y tient. Quand une réponse sait ce que vous ne venez pas de dire, ou se trompe sur vous, demandez d’où cela vient et corrigez dans la conversation. Les deux produits sont conçus pour accepter la correction ainsi.`
  }
 },
 /* ─────────────────────── 06 TOOLS ─────────────────────── */
@@ -1430,6 +1444,7 @@ const SOURCES = [
  {t:"Axios · Gemini 3.7 Flash arrives before Gemini 3.5 Pro (13 Aug 2026)",u:"https://www.axios.com/2026/08/13/google-gemini-37-flash"},
  {t:"Wikipedia · Agent harness",u:"https://en.wikipedia.org/wiki/Agent_harness"},
  {t:"Chroma · Context Rot: how increasing input tokens impacts LLM performance",u:"https://www.trychroma.com/research/context-rot"},
+ {t:"Google · Personalisation with memory of past Gemini chats",u:"https://support.google.com/gemini/answer/16598469"},
  {t:"Data Studios · Gemini memory, personal context and session behaviour",u:"https://www.datastudios.org/post/does-gemini-remember-past-conversations-context-retention-and-session-behavior"}
 ];
 </script>
