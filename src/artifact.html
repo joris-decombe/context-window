@@ -159,6 +159,9 @@ details.dive > summary:hover{color:var(--ink); background:var(--surface-2)}
 .dive-body p:last-child{margin-bottom:0}
 .dive-body strong{color:var(--ink)}
 
+p.onward{margin-top:1.1rem; padding-top:.85rem; border-top:1px dashed var(--line-2); font-size:.9em; color:var(--ink-3)}
+p.onward b{color:var(--ink-2)}
+p.onward a{color:var(--ink); text-decoration-color:var(--accent); text-decoration-thickness:2px}
 ul.bul{margin:0 0 1.2em; padding-left:1.15em}
 ul.bul li{margin-bottom:.5em}
 code, .k{font-family:var(--mono); font-size:.85em; background:var(--surface-2); padding:.12em .38em; border-radius:4px; color:var(--ink)}
@@ -335,6 +338,15 @@ table.matrix tr:hover td{background:var(--surface-2)}
 .pc p{font-family:var(--mono); font-size:.78rem; line-height:1.55; color:var(--ink-2); margin:0; white-space:pre-wrap}
 
 /* sources */
+.learn-group{margin-top:1.8rem}
+.learn-group h3{font-family:var(--display); font-size:1.05rem; font-weight:600; margin:0}
+.learn-note{font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:.04em; color:var(--ink-3); display:block; margin-top:.2rem}
+.learn-group ul{list-style:none; margin:.9rem 0 0; padding:0; display:flex; flex-direction:column; gap:.75rem}
+.learn-group li{border-left:3px solid var(--accent); padding-left:.85rem}
+.learn-group li a{font-family:var(--display); font-weight:600; font-size:1rem; color:var(--ink);
+  text-decoration-color:var(--accent); text-decoration-thickness:2px; display:inline-block}
+.learn-group li span{display:block; font-size:.92rem; color:var(--ink-2); margin-top:.15rem; line-height:1.45}
+
 #sources ol{padding-left:1.3em; font-size:.9rem; color:var(--ink-2)}
 #sources li{margin-bottom:.5em}
 #sources a{color:var(--ink); text-decoration-color:var(--accent); text-decoration-thickness:2px}
@@ -901,7 +913,8 @@ const SECTIONS = [
       <li><b>Hooks</b> fire on a lifecycle event and run regardless of what the model decides. Everything else on this page is a request; a hook is the only guarantee.</li>
       <li><b>Plugins</b> bundle the lot into something installable, so a setup can be shared across repositories or across a team.</li>
     </ul>
-    <p>The design idea worth stealing, even if you never write one, is <b>progressive disclosure</b>. A skill exposes only its name and description until the model judges it relevant; the body loads then, and its reference files only if the task reaches them. Almost none of it is resident, so the amount of expertise you can attach is effectively unlimited. You can apply the same principle by hand: keep your standing instructions to a short index of what exists and where, and let the assistant read the detail when it needs it. For a project instruction block that has grown bloated, that is the single highest-value edit.</p>`}
+    <p>The design idea worth stealing, even if you never write one, is <b>progressive disclosure</b>. A skill exposes only its name and description until the model judges it relevant; the body loads then, and its reference files only if the task reaches them. Almost none of it is resident, so the amount of expertise you can attach is effectively unlimited. You can apply the same principle by hand: keep your standing instructions to a short index of what exists and where, and let the assistant read the detail when it needs it. For a project instruction block that has grown bloated, that is the single highest-value edit.</p>
+    <p class="onward"><b>Anthropic’s own free courses on this:</b> <a href="https://academy.claude.com/courses/introduction-to-model-context-protocol">Introduction to MCP</a> and its <a href="https://academy.claude.com/courses/model-context-protocol-advanced-topics">advanced follow-up</a>, <a href="https://academy.claude.com/courses/introduction-to-agent-skills">Agent Skills</a>, <a href="https://academy.claude.com/courses/introduction-to-subagents">Subagents</a>. They are Anthropic material, so they cover Claude rather than the field.</p>`}
   ],
   callout:`<b>Connect something this week.</b> Most people are using one of these assistants at a fraction of its usefulness because it cannot see any of their actual material. One folder, read-only, is enough to feel the difference.`
  },
@@ -934,7 +947,8 @@ const SECTIONS = [
       <li>Les <b>hooks</b> se déclenchent sur un événement de cycle de vie et s’exécutent quoi que décide le modèle. Tout le reste de cette page est une demande ; le hook est la seule garantie.</li>
       <li>Les <b>plugins</b> empaquettent l’ensemble en une unité installable, pour partager une configuration entre dépôts ou au sein d’une équipe.</li>
     </ul>
-    <p>L’idée de conception à voler, même sans jamais en écrire une, est la <b>divulgation progressive</b>. Une skill n’expose que son nom et sa description tant que le modèle ne la juge pas pertinente ; le corps se charge alors, et ses fichiers de référence seulement si la tâche y touche. Presque rien ne réside en mémoire : la quantité d’expertise attachable est donc pratiquement illimitée. Vous pouvez appliquer le principe à la main : réduisez vos instructions permanentes à un index court de ce qui existe et où, et laissez l’assistant lire le détail au besoin. Pour un bloc d’instructions de projet devenu obèse, c’est la modification la plus rentable.</p>`}
+    <p>L’idée de conception à voler, même sans jamais en écrire une, est la <b>divulgation progressive</b>. Une skill n’expose que son nom et sa description tant que le modèle ne la juge pas pertinente ; le corps se charge alors, et ses fichiers de référence seulement si la tâche y touche. Presque rien ne réside en mémoire : la quantité d’expertise attachable est donc pratiquement illimitée. Vous pouvez appliquer le principe à la main : réduisez vos instructions permanentes à un index court de ce qui existe et où, et laissez l’assistant lire le détail au besoin. Pour un bloc d’instructions de projet devenu obèse, c’est la modification la plus rentable.</p>
+    <p class="onward"><b>Cours gratuits d’Anthropic sur le sujet :</b> <a href="https://academy.claude.com/courses/introduction-to-model-context-protocol">Introduction à MCP</a> et sa <a href="https://academy.claude.com/courses/model-context-protocol-advanced-topics">suite avancée</a>, <a href="https://academy.claude.com/courses/introduction-to-agent-skills">Agent Skills</a>, <a href="https://academy.claude.com/courses/introduction-to-subagents">Sous-agents</a>. En anglais. Ce sont des supports Anthropic : ils traitent de Claude, pas du domaine en général.</p>`}
   ],
   callout:`<b>Connectez quelque chose cette semaine.</b> La plupart des gens utilisent ces assistants à une fraction de leur utilité, parce qu’ils ne voient aucun de leurs vrais documents. Un dossier, en lecture seule, suffit à sentir la différence.`
  }
@@ -968,7 +982,8 @@ const SECTIONS = [
    {t:"Which one, for what",
     html:`<p>The official line is that Claude Code does software and Cowork does everything else. True, but there is a sharper way to choose: <b>ask where the work ends up.</b></p>
     <p>If it ends in a <b>decision or an explanation</b>, stay in the conversation. If it ends in a <b>document, a spreadsheet, a tidied folder or a message sent</b>, that is Cowork. If it ends in <b>code committed to a repository</b>, that is Claude Code.</p>
-    <p>And if you are not sure, start in the conversation. It is the cheapest place to find out what you actually want, and since September the app will escalate on its own when the job outgrows it.</p>`},
+    <p>And if you are not sure, start in the conversation. It is the cheapest place to find out what you actually want, and since September the app will escalate on its own when the job outgrows it.</p>
+    <p class="onward"><b>Anthropic’s own free courses on this:</b> <a href="https://academy.claude.com/courses/claude-101">Claude 101</a>, <a href="https://academy.claude.com/courses/introduction-to-claude-cowork">Introduction to Cowork</a>, <a href="https://academy.claude.com/courses/claude-code-101">Claude Code 101</a>. They are Anthropic material, so they cover Claude rather than the field.</p>`},
    {t:"Getting good results from Cowork",
     html:`<ul class="bul">
       <li><b>Choose the smallest folder that contains the job.</b> Access is the main thing you control, and a narrow folder also keeps it from wandering.</li>
@@ -1006,7 +1021,8 @@ const SECTIONS = [
    {t:"Laquelle, pour quoi",
     html:`<p>La ligne officielle veut que Claude Code fasse le logiciel et Cowork tout le reste. C’est vrai, mais il existe un critère plus net : <b>demandez-vous où finit le travail.</b></p>
     <p>S’il finit en <b>décision ou en explication</b>, restez dans la conversation. S’il finit en <b>document, tableur, dossier rangé ou message envoyé</b>, c’est Cowork. S’il finit en <b>code déposé dans un dépôt</b>, c’est Claude Code.</p>
-    <p>Et dans le doute, commencez par la conversation. C’est l’endroit le moins cher pour découvrir ce que vous voulez vraiment, et depuis septembre l’application monte d’elle-même en puissance quand la tâche la dépasse.</p>`},
+    <p>Et dans le doute, commencez par la conversation. C’est l’endroit le moins cher pour découvrir ce que vous voulez vraiment, et depuis septembre l’application monte d’elle-même en puissance quand la tâche la dépasse.</p>
+    <p class="onward"><b>Cours gratuits d’Anthropic sur le sujet :</b> <a href="https://academy.claude.com/courses/claude-101">Claude 101</a>, <a href="https://academy.claude.com/courses/introduction-to-claude-cowork">Introduction à Cowork</a>, <a href="https://academy.claude.com/courses/claude-code-101">Claude Code 101</a>. En anglais. Ce sont des supports Anthropic : ils traitent de Claude, pas du domaine en général.</p>`},
    {t:"Tirer quelque chose de bon de Cowork",
     html:`<ul class="bul">
       <li><b>Choisissez le plus petit dossier qui contient le travail.</b> L’accès est la variable principale que vous maîtrisez, et un périmètre étroit l’empêche d’errer.</li>
@@ -1256,7 +1272,8 @@ const SECTIONS = [
       <li><b>Put hard rules where they are enforced, not where they are requested.</b> &ldquo;Never touch the migrations directory&rdquo; in a markdown file is a hope; a hook that blocks the write is a rule.</li>
       <li><b>Use helper agents for wide reads</b> such as audits, searches, or mapping an unfamiliar codebase, so the main conversation stays clean.</li>
       <li><b>Review the diff, not the transcript.</b> The conversation is not the deliverable.</li>
-    </ol>`}
+    </ol>
+    <p class="onward"><b>Anthropic’s own free courses on this:</b> <a href="https://academy.claude.com/courses/claude-code-101">Claude Code 101</a> and <a href="https://academy.claude.com/courses/claude-code-in-action">Claude Code in Action</a>. They are Anthropic material, so they cover Claude rather than the field.</p>`}
   ]
  },
  fr:{
@@ -1337,11 +1354,53 @@ const SECTIONS = [
       <li><b>Mettez les règles dures là où elles sont imposées, pas là où elles sont demandées.</b> &laquo;&nbsp;Ne touche jamais au répertoire des migrations&nbsp;&raquo; dans un markdown est un espoir ; un hook qui bloque l’écriture est une règle.</li>
       <li><b>Utilisez des agents auxiliaires pour les lectures larges</b>, comme les audits, les recherches ou la cartographie d’une base inconnue, pour garder la conversation principale propre.</li>
       <li><b>Relisez le diff, pas la transcription.</b> La conversation n’est pas le livrable.</li>
-    </ol>`}
+    </ol>
+    <p class="onward"><b>Cours gratuits d’Anthropic sur le sujet :</b> <a href="https://academy.claude.com/courses/claude-code-101">Claude Code 101</a> et <a href="https://academy.claude.com/courses/claude-code-in-action">Claude Code in Action</a>. En anglais. Ce sont des supports Anthropic : ils traitent de Claude, pas du domaine en général.</p>`}
   ]
  }
 }
 ];
+
+const LEARN = {
+  en:{
+    title:"Where to go next",
+    lead:"Both companies publish free training. It is worth knowing whose material you are reading: each teaches its own products, so treat either one as a manual rather than a survey of the field. The courses below are the ones that line up with what this article covers.",
+    groups:[
+      {h:"Anthropic \u00b7 Claude Academy", note:"Free, account required. In English.",
+       items:[
+        ["AI Fluency: Framework and Foundations","ai-fluency-framework-foundations","4 hrs. The closest thing to this article in course form, and vendor-neutral for most of its length."],
+        ["AI Capabilities and Limitations","ai-capabilities-and-limitations","3.5 hrs. What these systems are and are not good at. Pairs with the parts of this article about trusting a confident tone."],
+        ["AI Fluency for Educators","ai-fluency-for-educators","A version aimed at teaching. There is a student edition too."],
+        ["Claude 101","claude-101","2.5 hrs. The product tour, if you want the buttons rather than the mechanics."]
+       ]},
+      {h:"Google", note:"Free. Less structured as a course, more as documentation.",
+       items:[
+        ["Understanding AI: tools, training and skills","::https://ai.google/learn-ai-skills/","Google's own hub for its AI training, including the AI Essentials series."],
+        ["Gemini API documentation","::https://ai.google.dev/gemini-api/docs","The reference behind most of what this article says about Gemini, including caching and the model list."],
+        ["Antigravity documentation","::https://antigravity.google/docs","For the agent-first development side, if you write software."]
+       ]}
+    ]
+  },
+  fr:{
+    title:"Pour aller plus loin",
+    lead:"Les deux \u00e9diteurs publient des formations gratuites. Il vaut la peine de savoir de qui l\u2019on lit le mat\u00e9riel\u00a0: chacun enseigne ses propres produits, donc prenez l\u2019un comme l\u2019autre pour un manuel plut\u00f4t que pour un panorama du domaine. Les cours ci-dessous sont ceux qui recoupent le contenu de cet article.",
+    groups:[
+      {h:"Anthropic \u00b7 Claude Academy", note:"Gratuit, compte requis. En anglais.",
+       items:[
+        ["AI Fluency: Framework and Foundations","ai-fluency-framework-foundations","4\u00a0h. Ce qui ressemble le plus \u00e0 cet article sous forme de cours, et neutre sur la majeure partie de son parcours."],
+        ["AI Capabilities and Limitations","ai-capabilities-and-limitations","3,5\u00a0h. Ce que ces syst\u00e8mes savent et ne savent pas faire. \u00c0 lire avec les passages de cet article sur le ton assur\u00e9."],
+        ["AI Fluency for Educators","ai-fluency-for-educators","Une version orient\u00e9e enseignement. Il existe aussi une \u00e9dition pour les \u00e9l\u00e8ves."],
+        ["Claude 101","claude-101","2,5\u00a0h. La visite guid\u00e9e du produit, si vous voulez les boutons plut\u00f4t que les m\u00e9canismes."]
+       ]},
+      {h:"Google", note:"Gratuit. Moins structur\u00e9 comme un cours, plut\u00f4t comme une documentation.",
+       items:[
+        ["Understanding AI\u00a0: outils, formation et comp\u00e9tences","::https://ai.google/learn-ai-skills/","Le portail de Google pour ses propres formations, dont la s\u00e9rie AI Essentials."],
+        ["Documentation de l\u2019API Gemini","::https://ai.google.dev/gemini-api/docs","La r\u00e9f\u00e9rence derri\u00e8re l\u2019essentiel de ce que dit cet article sur Gemini, y compris le cache et la liste des mod\u00e8les."],
+        ["Documentation Antigravity","::https://antigravity.google/docs","Pour le d\u00e9veloppement orient\u00e9 agents, si vous programmez."]
+       ]}
+    ]
+  }
+};
 
 const SOURCES = [
  {t:"Anthropic · Claude Platform pricing and model list",u:"https://platform.claude.com/docs/en/about-claude/pricing"},
@@ -1880,6 +1939,22 @@ function render(){
     if(tail.childNodes.length) sec.append(tail);
     app.append(sec);
   });
+
+  /* where to go next */
+  const L = LEARN[LANG];
+  const learn = el('section','sec'); learn.id='learn'; learn.style.setProperty('--accent','var(--a5)');
+  let lh = '<div class="col"><div class="sec-head"><span class="sec-num">\u2192</span><div style="flex:1"><h2>'+esc(L.title)+'</h2></div></div>'
+    + '<p>'+esc(L.lead)+'</p>';
+  L.groups.forEach(g=>{
+    lh += '<div class="learn-group"><h3>'+esc(g.h)+'</h3><span class="learn-note">'+esc(g.note)+'</span><ul>';
+    g.items.forEach(([name,slug,why])=>{
+      const href = slug.startsWith('::') ? slug.slice(2) : 'https://academy.claude.com/courses/'+slug;
+      lh += '<li><a href="'+href+'" target="_blank" rel="noopener">'+esc(name)+'</a><span>'+esc(why)+'</span></li>';
+    });
+    lh += '</ul></div>';
+  });
+  learn.innerHTML = lh + '</div>';
+  app.append(learn);
 
   /* sources */
   const src = el('section','sec'); src.id='sources'; src.style.setProperty('--accent','var(--a4)');
